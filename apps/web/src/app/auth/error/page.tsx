@@ -2,11 +2,13 @@ import Link from 'next/link';
 
 export const metadata = { title: 'Auth Error' };
 
-export default function AuthErrorPage({
+export default async function AuthErrorPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
+  const { error } = await searchParams;
+
   const errorMessages: Record<string, string> = {
     Configuration: 'Server configuration error. Please contact support.',
     AccessDenied: 'Access denied. You do not have permission.',
@@ -14,7 +16,7 @@ export default function AuthErrorPage({
     Default: 'An authentication error occurred.',
   };
 
-  const message = errorMessages[searchParams.error || ''] || errorMessages.Default;
+  const message = errorMessages[error || ''] || errorMessages.Default;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
@@ -22,9 +24,9 @@ export default function AuthErrorPage({
         <div>
           <h1 className="text-2xl font-bold text-destructive">Auth Error</h1>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-          {searchParams.error && (
+          {error && (
             <p className="mt-1 font-mono text-xs text-muted-foreground">
-              Code: {searchParams.error}
+              Code: {error}
             </p>
           )}
         </div>
