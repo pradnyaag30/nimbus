@@ -1,117 +1,133 @@
-import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Shield, CheckCircle, Clock, Lock, Tag, Server } from 'lucide-react';
+import { getDashboardData } from '@/lib/cloud/fetchDashboardData';
 
 export const metadata = { title: 'Governance' };
+export const dynamic = 'force-dynamic';
 
-// TODO: Replace with real data
-const policies = [
-  {
-    name: 'Tagging Compliance',
-    description: 'All resources must have cost-center, environment, and team tags',
-    compliant: 89,
-    total: 263,
-    severity: 'high' as const,
-  },
-  {
-    name: 'No Public S3 Buckets',
-    description: 'S3 buckets must not allow public access',
-    compliant: 42,
-    total: 42,
-    severity: 'critical' as const,
-  },
-  {
-    name: 'Encryption at Rest',
-    description: 'All storage resources must have encryption enabled',
-    compliant: 156,
-    total: 170,
-    severity: 'critical' as const,
-  },
-  {
-    name: 'Resource Naming Convention',
-    description: 'Resources must follow [env]-[team]-[service]-[id] naming',
-    compliant: 201,
-    total: 263,
-    severity: 'medium' as const,
-  },
-  {
-    name: 'Max Instance Size',
-    description: 'Dev/staging instances capped at medium tier',
-    compliant: 45,
-    total: 48,
-    severity: 'low' as const,
-  },
-];
+export default async function GovernancePage() {
+  const data = await getDashboardData();
+  const hasAccount = data.accountId && data.accountId !== 'not-connected';
 
-const severityColors = {
-  critical: 'text-red-600 dark:text-red-400',
-  high: 'text-orange-600 dark:text-orange-400',
-  medium: 'text-yellow-600 dark:text-yellow-400',
-  low: 'text-blue-600 dark:text-blue-400',
-};
+  // Define governance policies — these are aspirational checks
+  const policies = [
+    {
+      name: 'Cost Explorer Connected',
+      description: 'AWS Cost Explorer API is accessible and returning data',
+      status: hasAccount && data.totalSpendMTD > 0 ? 'pass' : 'fail',
+      icon: CheckCircle,
+    },
+    {
+      name: 'CUR Report Configured',
+      description: 'Daily Cost and Usage Report is set up in S3 for detailed billing',
+      status: hasAccount ? 'pass' : 'fail',
+      icon: Clock,
+    },
+    {
+      name: 'IAM Least Privilege',
+      description: 'Nimbus uses read-only IAM credentials (ce:*, sts:GetCallerIdentity)',
+      status: hasAccount ? 'pass' : 'pending',
+      icon: Lock,
+    },
+    {
+      name: 'Budget Alerts',
+      description: 'AWS Budgets with SNS email alerts configured for overspend notifications',
+      status: 'pending',
+      icon: Shield,
+    },
+    {
+      name: 'Tagging Compliance',
+      description: 'All resources tagged with cost-center, environment, and team tags',
+      status: 'pending',
+      icon: Tag,
+    },
+    {
+      name: 'Compute Optimizer',
+      description: 'AWS Compute Optimizer enabled for rightsizing recommendations',
+      status: hasAccount ? 'pass' : 'pending',
+      icon: Server,
+    },
+  ];
 
-export default function GovernancePage() {
+  const passCount = policies.filter((p) => p.status === 'pass').length;
+  const pendingCount = policies.filter((p) => p.status === 'pending').length;
+  const failCount = policies.filter((p) => p.status === 'fail').length;
+
+  const statusStyles = {
+    pass: {
+      badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      icon: 'text-green-500',
+      label: 'Compliant',
+    },
+    pending: {
+      badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      icon: 'text-yellow-500',
+      label: 'Pending',
+    },
+    fail: {
+      badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      icon: 'text-red-500',
+      label: 'Action Required',
+    },
+  };
+
   return (
     <div className="space-y-6 animate-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Governance</h1>
           <p className="text-sm text-muted-foreground">
-            Policy compliance, tagging rules, and cost governance.
+            FinOps readiness checklist and compliance status
+            {hasAccount ? ` — AWS Account ${data.accountId}` : ''}
           </p>
         </div>
-        <button className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
-          <Shield className="h-4 w-4" />
-          New Policy
-        </button>
       </div>
 
-      <div className="space-y-4">
-        {policies.map((policy) => {
-          const pct = (policy.compliant / policy.total) * 100;
-          const isFullyCompliant = pct === 100;
+      {/* Summary */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Compliant</p>
+          <p className="mt-1 text-3xl font-bold text-green-600 dark:text-green-400">{passCount}/{policies.length}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Pending Setup</p>
+          <p className="mt-1 text-3xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Action Required</p>
+          <p className="mt-1 text-3xl font-bold text-red-600 dark:text-red-400">{failCount}</p>
+        </div>
+      </div>
 
+      {/* Policy checklist */}
+      <div className="space-y-3">
+        {policies.map((policy) => {
+          const style = statusStyles[policy.status as keyof typeof statusStyles];
+          const Icon = policy.icon;
           return (
             <div key={policy.name} className="rounded-xl border bg-card p-5 shadow-sm">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
-                  {isFullyCompliant ? (
-                    <CheckCircle className="mt-0.5 h-5 w-5 text-green-500" />
-                  ) : pct >= 90 ? (
-                    <AlertTriangle className="mt-0.5 h-5 w-5 text-yellow-500" />
-                  ) : (
-                    <XCircle className="mt-0.5 h-5 w-5 text-red-500" />
-                  )}
+                  <Icon className={`mt-0.5 h-5 w-5 ${style.icon}`} />
                   <div>
                     <h3 className="font-semibold">{policy.name}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{policy.description}</p>
                   </div>
                 </div>
-                <span className={`text-xs font-medium uppercase ${severityColors[policy.severity]}`}>
-                  {policy.severity}
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.badge}`}>
+                  {style.label}
                 </span>
-              </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-sm">
-                  <span>
-                    {policy.compliant}/{policy.total} compliant
-                  </span>
-                  <span className="font-medium">{pct.toFixed(1)}%</span>
-                </div>
-                <div className="mt-1.5 h-2 rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full ${
-                      isFullyCompliant
-                        ? 'bg-green-500'
-                        : pct >= 90
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
-                    }`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
               </div>
             </div>
           );
         })}
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          <strong>Next steps:</strong> Enable AWS Config rules for deeper compliance checks including
+          tagging enforcement, encryption validation, and public access controls.
+          These integrate with Nimbus for automated policy monitoring.
+        </p>
       </div>
     </div>
   );

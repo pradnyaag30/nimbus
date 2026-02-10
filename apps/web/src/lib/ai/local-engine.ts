@@ -3,7 +3,11 @@ import { type CostSummary } from './cost-context';
 // Smart rule-based response engine that works without an external API.
 // Handles diverse natural language questions about cloud costs.
 
-const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+const fmt = (n: number) => {
+  if (n === 0) return '$0';
+  if (n < 1) return `$${n.toFixed(2)}`;
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 const pct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`;
 
 // Keyword extraction — normalize user input into tokens
@@ -25,16 +29,22 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
 
   // --- GREETINGS & HELP ---
   if (has(tokens, 'hello', 'hi', 'hey', 'help', 'what can')) {
-    return `I'm **Nimbus AI**, your Cloud FinOps assistant. I can answer questions about anything on your dashboard:\n\n- **Spending**: "total spend", "cost by provider", "which service costs most"\n- **Anomalies**: "any spikes?", "which server is bleeding money?"\n- **Budgets**: "are we over budget?", "budget status"\n- **Savings**: "how to reduce costs?", "where can we save?"\n- **Providers**: "AWS breakdown", "Azure status", "GCP cost"\n- **Forecasts**: "projected spend", "next month estimate"\n- **Summary**: "give me a full report"\n\nJust ask in plain language!`;
+    const hasData = data.totalSpendMTD > 0;
+    return `I'm **Nimbus AI**, your Cloud FinOps assistant powered by live AWS Cost Explorer data.\n\n${hasData ? `📊 **Connected to AWS Account** — tracking real spend data.\n\n` : ''}I can answer questions about:\n\n- **Spending**: "total spend", "cost this month", "how much are we spending?"\n- **Services**: "top services", "which service costs most?", "EC2 cost"\n- **Trends**: "cost trend", "month over month", "are costs going up?"\n- **Forecasts**: "projected spend", "forecast", "end of month estimate"\n- **Breakdown**: "AWS breakdown", "service breakdown"\n- **Summary**: "give me a full report", "executive summary"\n\nJust ask in plain language!`;
   }
 
   // --- TOTAL SPEND / OVERVIEW ---
   if (has(tokens, 'total', 'overall', 'spend', 'mtd', 'much', 'current', 'dashboard')) {
     if (has(tokens, 'aws', 'amazon')) return awsBreakdown(data);
-    if (has(tokens, 'azure', 'microsoft')) return azureBreakdown(data);
-    if (has(tokens, 'gcp', 'google')) return gcpBreakdown(data);
+    if (has(tokens, 'azure', 'microsoft')) return providerNotConnected('Azure');
+    if (has(tokens, 'gcp', 'google')) return providerNotConnected('GCP');
 
-    return `**Total Spend (MTD):** ${fmt(data.totalSpendMTD)}\n**Forecasted Monthly:** ${fmt(data.forecastedSpend)}\n\nBreakdown by provider:\n${data.providers.map((p) => `- **${p.name}:** ${fmt(p.spend)} (${pct(p.change)} MoM)`).join('\n')}\n\nAWS leads at ${((data.providers[0].spend / data.totalSpendMTD) * 100).toFixed(0)}% of total spend.`;
+    if (data.totalSpendMTD === 0) {
+      return `No cost data available yet. Make sure AWS credentials are configured and the account has active resources.`;
+    }
+
+    const daily = data.totalSpendMTD / Math.max(new Date().getDate(), 1);
+    return `**Total Spend (MTD):** ${fmt(data.totalSpendMTD)}\n**Forecasted Monthly:** ${fmt(data.forecastedSpend)}\n**Daily Run Rate:** ${fmt(daily)}\n\n**Provider Breakdown:**\n${data.providers.map((p) => `- **${p.name}:** ${fmt(p.spend)} (${pct(p.change)} MoM)`).join('\n')}\n\n${data.topServices.length > 0 ? `**Top Service:** ${data.topServices[0].name} at ${fmt(data.topServices[0].cost)}` : ''}`;
   }
 
   // --- TOP SERVICES / HIGHEST COST ---
@@ -49,29 +59,42 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
     const openAnomalies = data.anomalies.filter((a) => a.status === 'open');
     const overBudget = data.budgets.filter((b) => b.spent > b.limit);
     const spiking = data.topServices.filter((s) => s.change > 8);
-    const totalImpact = openAnomalies.reduce((s, a) => s + a.impact, 0);
 
-    let response = `**🔴 Areas Needing Attention:**\n\n`;
+    let response = `**🔍 Areas Needing Attention:**\n\n`;
+    let foundIssues = false;
 
     if (openAnomalies.length > 0) {
+      const totalImpact = openAnomalies.reduce((s, a) => s + a.impact, 0);
       response += `**Anomalies (${openAnomalies.length} active, ${fmt(totalImpact)} impact):**\n`;
       response += openAnomalies.map((a) => `- ${a.title} — **${a.provider}/${a.service}** — ${fmt(a.impact)}`).join('\n');
       response += '\n\n';
+      foundIssues = true;
     }
 
     if (overBudget.length > 0) {
       response += `**Over Budget (${overBudget.length}):**\n`;
       response += overBudget.map((b) => `- ${b.name}: ${fmt(b.spent)} / ${fmt(b.limit)} (${((b.spent / b.limit) * 100).toFixed(0)}%)`).join('\n');
       response += '\n\n';
+      foundIssues = true;
     }
 
     if (spiking.length > 0) {
-      response += `**Cost Spikes:**\n`;
-      response += spiking.map((s) => `- ${s.name} (${s.provider}): ${pct(s.change)} increase`).join('\n');
+      response += `**Cost Spikes (>8% MoM increase):**\n`;
+      response += spiking.map((s) => `- ${s.name} (${s.provider}): ${pct(s.change)} increase — ${fmt(s.cost)}`).join('\n');
       response += '\n\n';
+      foundIssues = true;
     }
 
-    response += `**Priority Action:** Investigate the EC2 data transfer anomaly first (${fmt(openAnomalies[0]?.impact || 0)} impact).`;
+    if (!foundIssues) {
+      response += `✅ No critical issues detected.\n\n`;
+      if (data.topServices.length > 0) {
+        const biggest = data.topServices[0];
+        response += `Your biggest cost center is **${biggest.name}** at ${fmt(biggest.cost)} (${pct(biggest.change)} MoM). Overall spend looks stable.`;
+      }
+    } else {
+      response += `**Priority:** Focus on the highest-cost spiking services first.`;
+    }
+
     return response;
   }
 
@@ -109,10 +132,10 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
   if (has(tokens, 'aws', 'amazon')) return awsBreakdown(data);
 
   // --- AZURE SPECIFIC ---
-  if (has(tokens, 'azure', 'microsoft')) return azureBreakdown(data);
+  if (has(tokens, 'azure', 'microsoft')) return providerNotConnected('Azure');
 
   // --- GCP SPECIFIC ---
-  if (has(tokens, 'gcp', 'google', 'gcloud')) return gcpBreakdown(data);
+  if (has(tokens, 'gcp', 'google', 'gcloud')) return providerNotConnected('GCP');
 
   // --- KUBERNETES ---
   if (has(tokens, 'k8s', 'kubernetes', 'kube', 'container', 'pod', 'cluster', 'eks', 'aks', 'gke')) {
@@ -201,33 +224,65 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
 
 // --- Helper functions ---
 
+function providerNotConnected(provider: string): string {
+  return `**${provider}** is not currently connected to Nimbus.\n\nOnly **AWS** is connected right now. To add ${provider}, go to **Cloud Accounts** and connect your ${provider} subscription/project.\n\nWould you like to see AWS cost data instead?`;
+}
+
 function awsBreakdown(data: CostSummary): string {
   const awsServices = data.topServices.filter((s) => s.provider === 'AWS');
-  const provider = data.providers.find((p) => p.name === 'AWS')!;
-  const budget = data.budgets.find((b) => b.provider === 'AWS');
-  const anomalies = data.anomalies.filter((a) => a.provider === 'AWS' && a.status === 'open');
-  return `**AWS Spend Overview:**\n\n**Total:** ${fmt(provider.spend)} (${pct(provider.change)} MoM)\n\n**Services:**\n${awsServices.map((s) => `- ${s.name}: ${fmt(s.cost)} (${pct(s.change)})`).join('\n')}\n\n${budget ? `**Budget:** ${fmt(budget.spent)} / ${fmt(budget.limit)} (${((budget.spent / budget.limit) * 100).toFixed(0)}%)` : ''}\n${anomalies.length > 0 ? `\n⚠️ **${anomalies.length} active anomalies:** ${anomalies.map((a) => a.title).join(', ')}` : '\n✅ No AWS anomalies.'}`;
-}
+  const provider = data.providers.find((p) => p.name === 'AWS');
 
-function azureBreakdown(data: CostSummary): string {
-  const services = data.topServices.filter((s) => s.provider === 'Azure');
-  const provider = data.providers.find((p) => p.name === 'Azure')!;
-  const budget = data.budgets.find((b) => b.provider === 'Azure');
-  const anomalies = data.anomalies.filter((a) => a.provider === 'Azure' && a.status === 'open');
-  return `**Azure Spend Overview:**\n\n**Total:** ${fmt(provider.spend)} (${pct(provider.change)} MoM)\n\n**Services:**\n${services.map((s) => `- ${s.name}: ${fmt(s.cost)} (${pct(s.change)})`).join('\n')}\n\n${budget ? `**Budget:** ${fmt(budget.spent)} / ${fmt(budget.limit)} (${((budget.spent / budget.limit) * 100).toFixed(0)}%)` : ''}\n${anomalies.length > 0 ? `\n⚠️ **${anomalies.length} active anomalies:** ${anomalies.map((a) => a.title).join(', ')}` : '\n✅ No Azure anomalies.'}`;
-}
+  if (!provider || provider.spend === 0) {
+    return `**AWS** account is connected but no spend data is available yet. Cost data may take up to 24 hours to appear after initial setup.`;
+  }
 
-function gcpBreakdown(data: CostSummary): string {
-  const services = data.topServices.filter((s) => s.provider === 'GCP');
-  const provider = data.providers.find((p) => p.name === 'GCP')!;
-  const budget = data.budgets.find((b) => b.provider === 'GCP');
-  const anomalies = data.anomalies.filter((a) => a.provider === 'GCP' && a.status === 'open');
-  return `**GCP Spend Overview:**\n\n**Total:** ${fmt(provider.spend)} (${pct(provider.change)} MoM)\n\n**Services:**\n${services.map((s) => `- ${s.name}: ${fmt(s.cost)} (${pct(s.change)})`).join('\n')}\n\n${budget ? `**Budget:** ${fmt(budget.spent)} / ${fmt(budget.limit)} (${((budget.spent / budget.limit) * 100).toFixed(0)}%) ⚠️ **Over budget!**` : ''}\n${anomalies.length > 0 ? `\n⚠️ **${anomalies.length} active anomalies:** ${anomalies.map((a) => a.title).join(', ')}` : '\n✅ No GCP anomalies.'}`;
+  const spiking = awsServices.filter((s) => s.change > 20);
+  let response = `**AWS Spend Overview:**\n\n**Total MTD:** ${fmt(provider.spend)} (${pct(provider.change)} MoM)\n\n**Top Services:**\n${awsServices.slice(0, 8).map((s) => `- ${s.name}: ${fmt(s.cost)} (${pct(s.change)})`).join('\n')}`;
+
+  if (spiking.length > 0) {
+    response += `\n\n⚠️ **Services spiking:** ${spiking.map((s) => `${s.name} (${pct(s.change)})`).join(', ')}`;
+  } else {
+    response += `\n\n✅ All services within normal range.`;
+  }
+
+  return response;
 }
 
 function nocSummary(data: CostSummary): string {
-  const openAnomalies = data.anomalies.filter((a) => a.status === 'open');
-  const overBudget = data.budgets.filter((b) => b.spent > b.limit);
-  const totalReco = data.recommendations.reduce((s, r) => s + r.savings, 0);
-  return `**NOC Summary — Cloud FinOps Status:**\n\n💰 **Spend MTD:** ${fmt(data.totalSpendMTD)} | Forecast: ${fmt(data.forecastedSpend)}\n📊 **Top Provider:** AWS at ${fmt(data.providers[0].spend)}\n🔴 **Anomalies:** ${openAnomalies.length} open (${fmt(openAnomalies.reduce((s, a) => s + a.impact, 0))} impact)\n📋 **Budgets:** ${overBudget.length > 0 ? `${overBudget.length} exceeded` : 'All within limits'}\n💡 **Savings Available:** ${fmt(totalReco)}/month\n\n**Top 3 Actions:**\n1. Investigate EC2 data transfer anomaly (${fmt(openAnomalies[0]?.impact || 0)})\n2. Address GCP Analytics over-budget\n3. Apply Reserved Instance recommendations (${fmt(12400)}/mo savings)`;
+  if (data.totalSpendMTD === 0) {
+    return `**Nimbus FinOps Status:**\n\nNo cost data available. Please ensure AWS credentials are configured and the account has active resources.`;
+  }
+
+  const spiking = data.topServices.filter((s) => s.change > 20);
+  const topService = data.topServices[0];
+  const daily = data.totalSpendMTD / Math.max(new Date().getDate(), 1);
+
+  let response = `**Executive Summary — Cloud FinOps:**\n\n`;
+  response += `💰 **Spend MTD:** ${fmt(data.totalSpendMTD)} | Forecast: ${fmt(data.forecastedSpend)}\n`;
+  response += `📊 **Daily Run Rate:** ${fmt(daily)}\n`;
+
+  if (data.providers.length > 0) {
+    response += `☁️ **Provider:** ${data.providers.map((p) => `${p.name} ${fmt(p.spend)} (${pct(p.change)})`).join(', ')}\n`;
+  }
+
+  if (topService) {
+    response += `🏆 **Top Service:** ${topService.name} at ${fmt(topService.cost)}\n`;
+  }
+
+  if (spiking.length > 0) {
+    response += `\n⚠️ **${spiking.length} service(s) spiking:** ${spiking.map((s) => `${s.name} (${pct(s.change)})`).join(', ')}\n`;
+  } else {
+    response += `\n✅ All services within normal range.\n`;
+  }
+
+  response += `\n**Quick Actions:**\n`;
+  if (spiking.length > 0) {
+    response += `1. Investigate spiking services\n`;
+  }
+  if (topService && topService.cost > data.totalSpendMTD * 0.3) {
+    response += `${spiking.length > 0 ? '2' : '1'}. Review ${topService.name} — consuming ${((topService.cost / data.totalSpendMTD) * 100).toFixed(0)}% of total spend\n`;
+  }
+  response += `${spiking.length > 0 ? '3' : '2'}. Consider Reserved Instances for stable workloads`;
+
+  return response;
 }
