@@ -9,9 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { getCurrencySymbol, formatCurrency } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
 
-// TODO: Replace with real data
 const data = [
   { date: 'Jan', aws: 18200, azure: 12400, gcp: 8100 },
   { date: 'Feb', aws: 19100, azure: 11800, gcp: 8400 },
@@ -28,6 +27,8 @@ const data = [
 ];
 
 export function CostTrendChart() {
+  const { symbol, convert, format } = useCurrency();
+
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4">
@@ -56,7 +57,7 @@ export function CostTrendChart() {
             <YAxis
               className="text-xs"
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
-              tickFormatter={(v) => `${getCurrencySymbol()}${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v) => `${symbol}${(convert(v) / 1000).toFixed(0)}k`}
             />
             <Tooltip
               contentStyle={{
@@ -65,32 +66,11 @@ export function CostTrendChart() {
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
-              formatter={(value: number) => [formatCurrency(value), undefined]}
+              formatter={(value: number) => [format(value), undefined]}
             />
-            <Area
-              type="monotone"
-              dataKey="aws"
-              name="AWS"
-              stroke="hsl(25, 95%, 53%)"
-              fill="url(#colorAws)"
-              strokeWidth={2}
-            />
-            <Area
-              type="monotone"
-              dataKey="azure"
-              name="Azure"
-              stroke="hsl(210, 100%, 50%)"
-              fill="url(#colorAzure)"
-              strokeWidth={2}
-            />
-            <Area
-              type="monotone"
-              dataKey="gcp"
-              name="GCP"
-              stroke="hsl(142, 76%, 36%)"
-              fill="url(#colorGcp)"
-              strokeWidth={2}
-            />
+            <Area type="monotone" dataKey="aws" name="AWS" stroke="hsl(25, 95%, 53%)" fill="url(#colorAws)" strokeWidth={2} />
+            <Area type="monotone" dataKey="azure" name="Azure" stroke="hsl(210, 100%, 50%)" fill="url(#colorAzure)" strokeWidth={2} />
+            <Area type="monotone" dataKey="gcp" name="GCP" stroke="hsl(142, 76%, 36%)" fill="url(#colorGcp)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

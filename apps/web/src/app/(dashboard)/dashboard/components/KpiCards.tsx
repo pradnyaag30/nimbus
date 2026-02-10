@@ -1,7 +1,9 @@
-import { DollarSign, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
-import { formatCurrency, formatPercentage } from '@/lib/utils';
+'use client';
 
-// TODO: Replace with real data from API
+import { DollarSign, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { formatPercentage } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
+
 const kpis = [
   {
     title: 'Total Spend (MTD)',
@@ -35,6 +37,8 @@ const kpis = [
 ];
 
 export function KpiCards() {
+  const { format } = useCurrency();
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {kpis.map((kpi) => (
@@ -45,7 +49,7 @@ export function KpiCards() {
           </div>
           <div className="mt-2">
             <p className="text-2xl font-bold">
-              {kpi.isCurrency === false ? kpi.value : formatCurrency(kpi.value)}
+              {kpi.isCurrency === false ? kpi.value : format(kpi.value)}
             </p>
             {kpi.change !== 0 && (
               <p

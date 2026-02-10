@@ -1,7 +1,8 @@
-import { Lightbulb, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+'use client';
 
-// TODO: Replace with real data
+import { Lightbulb, ArrowRight } from 'lucide-react';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
+
 const recommendations = [
   {
     id: '1',
@@ -52,6 +53,7 @@ const severityStyles = {
 };
 
 export function RecentRecommendations() {
+  const { format } = useCurrency();
   const totalSavings = recommendations.reduce((sum, r) => sum + r.savings, 0);
 
   return (
@@ -60,7 +62,7 @@ export function RecentRecommendations() {
         <div>
           <h3 className="font-semibold">Recommendations</h3>
           <p className="text-sm text-muted-foreground">
-            {formatCurrency(totalSavings)}/mo potential savings
+            {format(totalSavings)}/mo potential savings
           </p>
         </div>
         <Lightbulb className="h-5 w-5 text-warning" />
@@ -84,7 +86,7 @@ export function RecentRecommendations() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                {formatCurrency(rec.savings)}/mo
+                {format(rec.savings)}/mo
               </span>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </div>

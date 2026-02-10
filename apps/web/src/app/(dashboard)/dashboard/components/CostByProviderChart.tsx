@@ -1,9 +1,8 @@
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
 
-// TODO: Replace with real data
 const data = [
   { name: 'AWS', value: 20800, color: 'hsl(25, 95%, 53%)' },
   { name: 'Azure', value: 14200, color: 'hsl(210, 100%, 50%)' },
@@ -14,6 +13,8 @@ const data = [
 const total = data.reduce((sum, item) => sum + item.value, 0);
 
 export function CostByProviderChart() {
+  const { format } = useCurrency();
+
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4">
@@ -38,7 +39,7 @@ export function CostByProviderChart() {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => formatCurrency(value)}
+              formatter={(value: number) => format(value)}
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',
@@ -60,7 +61,7 @@ export function CostByProviderChart() {
               <span className="text-muted-foreground">
                 {((item.value / total) * 100).toFixed(1)}%
               </span>
-              <span className="font-medium">{formatCurrency(item.value)}</span>
+              <span className="font-medium">{format(item.value)}</span>
             </div>
           </div>
         ))}

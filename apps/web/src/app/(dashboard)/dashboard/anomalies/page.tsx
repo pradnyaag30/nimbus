@@ -1,9 +1,9 @@
-import { formatCurrency, formatDate } from '@/lib/utils';
+'use client';
+
+import { formatDate } from '@/lib/utils';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
 
-export const metadata = { title: 'Anomalies' };
-
-// TODO: Replace with real data
 const anomalies = [
   {
     id: '1',
@@ -48,6 +48,7 @@ const anomalies = [
 ];
 
 export default function AnomaliesPage() {
+  const { format } = useCurrency();
   const openCount = anomalies.filter((a) => a.status === 'open').length;
   const totalImpact = anomalies
     .filter((a) => a.status === 'open')
@@ -69,7 +70,7 @@ export default function AnomaliesPage() {
         </div>
         <div className="rounded-xl border bg-card p-6">
           <p className="text-sm text-muted-foreground">Estimated Impact</p>
-          <p className="mt-1 text-3xl font-bold">{formatCurrency(totalImpact)}</p>
+          <p className="mt-1 text-3xl font-bold">{format(totalImpact)}</p>
         </div>
       </div>
 
@@ -96,7 +97,7 @@ export default function AnomaliesPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-destructive">{formatCurrency(anomaly.impact)}</p>
+                <p className="font-semibold text-destructive">{format(anomaly.impact)}</p>
                 <span
                   className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                     anomaly.status === 'open'

@@ -22,7 +22,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { formatCurrency, getCurrencySymbol } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
 
 // Sample data — in production, fetched from API with auto-refresh
 const costTrend = [
@@ -62,6 +62,7 @@ const topServices = [
 ];
 
 export function TvDashboard() {
+  const { format, symbol, convert } = useCurrency();
   const [time, setTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
@@ -118,21 +119,21 @@ export function TvDashboard() {
       <div className="mb-6 grid grid-cols-4 gap-4">
         <KpiCard
           title="Total Spend (MTD)"
-          value={formatCurrency(totalSpend)}
+          value={format(totalSpend)}
           change={-3.2}
           icon={DollarSign}
           color="text-primary"
         />
         <KpiCard
           title="Forecasted Spend"
-          value={formatCurrency(forecast)}
+          value={format(forecast)}
           change={2.1}
           icon={TrendingUp}
           color="text-orange-500"
         />
         <KpiCard
           title="Savings Available"
-          value={formatCurrency(savings)}
+          value={format(savings)}
           subtitle="/month"
           icon={TrendingDown}
           color="text-green-500"
@@ -173,7 +174,7 @@ export function TvDashboard() {
                 />
                 <YAxis
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                  tickFormatter={(v) => `${getCurrencySymbol()}${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={(v) => `${symbol}${(convert(v) / 1000).toFixed(0)}k`}
                 />
                 <Area
                   type="monotone"
@@ -221,7 +222,7 @@ export function TvDashboard() {
                       <span className="text-sm font-medium">{p.name}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-semibold">{formatCurrency(p.value)}</span>
+                      <span className="text-sm font-semibold">{format(p.value)}</span>
                       <span
                         className={`ml-2 text-xs ${p.change < 0 ? 'text-green-500' : 'text-red-500'}`}
                       >
@@ -254,7 +255,7 @@ export function TvDashboard() {
                     />
                     <span className="text-sm">{a.title}</span>
                   </div>
-                  <span className="text-sm font-semibold text-red-500">{formatCurrency(a.impact)}</span>
+                  <span className="text-sm font-semibold text-red-500">{format(a.impact)}</span>
                 </div>
               ))}
             </div>
@@ -276,7 +277,7 @@ export function TvDashboard() {
                   <div className="flex-1">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium">{s.name}</span>
-                      <span className="font-semibold">{formatCurrency(s.cost)}</span>
+                      <span className="font-semibold">{format(s.cost)}</span>
                     </div>
                     <div className="mt-1 h-1.5 rounded-full bg-muted">
                       <div
@@ -308,7 +309,7 @@ export function TvDashboard() {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{b.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {formatCurrency(b.spent)} / {formatCurrency(b.limit)}
+                      {format(b.spent)} / {format(b.limit)}
                     </span>
                   </div>
                   <div className="mt-1 flex items-center gap-2">

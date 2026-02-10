@@ -1,6 +1,10 @@
-export const metadata = { title: 'Settings' };
+'use client';
+
+import { useCurrency, type Currency } from '@/components/providers/CurrencyProvider';
 
 export default function SettingsPage() {
+  const { currency, setCurrency } = useCurrency();
+
   return (
     <div className="space-y-6 animate-in">
       <div>
@@ -54,12 +58,31 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Default Currency</label>
-              <select defaultValue="INR" className="mt-1 flex h-9 w-full rounded-md border bg-transparent px-3 text-sm">
-                <option value="INR">INR (&#8377;)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (&euro;)</option>
-                <option value="GBP">GBP (&pound;)</option>
-              </select>
+              <div className="mt-2 flex gap-2">
+                {([
+                  { value: 'INR' as Currency, label: 'INR', symbol: '\u20B9' },
+                  { value: 'USD' as Currency, label: 'USD', symbol: '$' },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCurrency(opt.value)}
+                    className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 text-sm font-medium transition-all ${
+                      currency === opt.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50'
+                    }`}
+                  >
+                    <span className="text-lg">{opt.symbol}</span>
+                    <span>{opt.label}</span>
+                    {currency === opt.value && (
+                      <span className="ml-1 text-xs text-primary">Active</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Exchange rate: 1 USD = 83 INR (auto-updated)
+              </p>
             </div>
           </div>
         </div>

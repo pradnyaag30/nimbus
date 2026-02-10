@@ -1,6 +1,8 @@
-import { formatCurrency, formatPercentage } from '@/lib/utils';
+'use client';
 
-// TODO: Replace with real data
+import { formatPercentage } from '@/lib/utils';
+import { useCurrency } from '@/components/providers/CurrencyProvider';
+
 const services = [
   { name: 'Amazon EC2', provider: 'AWS', cost: 8420, change: -2.1 },
   { name: 'Azure SQL Database', provider: 'Azure', cost: 5230, change: 5.3 },
@@ -19,6 +21,8 @@ const providerColors: Record<string, string> = {
 };
 
 export function TopServices() {
+  const { format } = useCurrency();
+
   return (
     <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4">
@@ -36,7 +40,7 @@ export function TopServices() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium">{formatCurrency(service.cost)}</p>
+              <p className="text-sm font-medium">{format(service.cost)}</p>
               <p
                 className={`text-xs ${
                   service.change < 0

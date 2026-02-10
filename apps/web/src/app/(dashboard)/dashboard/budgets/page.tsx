@@ -1,8 +1,7 @@
-import { formatCurrency } from '@/lib/utils';
+'use client';
 
-export const metadata = { title: 'Budgets' };
+import { useCurrency } from '@/components/providers/CurrencyProvider';
 
-// TODO: Replace with real data
 const budgets = [
   { name: 'AWS Production', limit: 25000, spent: 20800, provider: 'AWS' },
   { name: 'Azure Development', limit: 10000, spent: 7200, provider: 'Azure' },
@@ -11,6 +10,8 @@ const budgets = [
 ];
 
 export default function BudgetsPage() {
+  const { format } = useCurrency();
+
   return (
     <div className="space-y-6 animate-in">
       <div className="flex items-center justify-between">
@@ -52,8 +53,8 @@ export default function BudgetsPage() {
               </div>
               <div className="mt-4">
                 <div className="flex justify-between text-sm">
-                  <span>{formatCurrency(budget.spent)} spent</span>
-                  <span className="text-muted-foreground">{formatCurrency(budget.limit)} limit</span>
+                  <span>{format(budget.spent)} spent</span>
+                  <span className="text-muted-foreground">{format(budget.limit)} limit</span>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-muted">
                   <div
