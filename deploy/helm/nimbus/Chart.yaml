@@ -1,0 +1,13 @@
+apiVersion: v2
+name: nimbus
+description: Nimbus - Unified Cloud FinOps Platform
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+keywords:
+  - finops
+  - cloud-cost
+  - kubernetes
+  - multi-cloud
+maintainers:
+  - name: Nimbus Team

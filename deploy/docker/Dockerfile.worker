@@ -1,0 +1,42 @@
+# =============================================================================
+# Nimbus - Ingestion Worker Dockerfile
+# =============================================================================
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY workers/ingestion/package.json ./workers/ingestion/
+COPY packages/db/package.json ./packages/db/
+
+RUN pnpm install --frozen-lockfile --filter @nimbus/ingestion...
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/workers/ingestion/node_modules ./workers/ingestion/node_modules
+COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY . .
+
+RUN pnpm --filter @nimbus/db exec prisma generate
+RUN pnpm --filter @nimbus/ingestion build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN addgroup --system --gid 1001 nimbus && \
+    adduser --system --uid 1001 nimbus
+
+ENV NODE_ENV=production
+
+COPY --from=builder /app/workers/ingestion/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+
+USER nimbus
+
+CMD ["node", "dist/index.js"]

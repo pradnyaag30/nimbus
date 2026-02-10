@@ -1,0 +1,410 @@
+// =============================================================================
+// Nimbus - Prisma Schema
+// FOCUS-aligned cloud FinOps data model with multi-tenant isolation
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Multi-Tenancy & Auth
+// =============================================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  primaryColor String @default("#3B82F6") @map("primary_color")
+  currency  String   @default("USD")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users             User[]
+  cloudAccounts     CloudAccount[]
+  costLineItems     CostLineItem[]
+  budgets           Budget[]
+  recommendations   Recommendation[]
+  anomalies         Anomaly[]
+  governancePolicies GovernancePolicy[]
+  resources         CloudResource[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String
+  name          String?
+  passwordHash  String?   @map("password_hash")
+  image         String?
+  role          UserRole  @default(VIEWER)
+  emailVerified DateTime? @map("email_verified")
+  tenantId      String    @map("tenant_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  accounts Account[]
+  sessions Session[]
+
+  @@unique([email, tenantId])
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token") @db.Text
+  accessToken       String? @map("access_token") @db.Text
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
+  scope             String?
+  idToken           String? @map("id_token") @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// =============================================================================
+// Cloud Provider Accounts
+// =============================================================================
+
+model CloudAccount {
+  id              String              @id @default(cuid())
+  tenantId        String              @map("tenant_id")
+  name            String
+  provider        CloudProvider
+  externalId      String              @map("external_id")
+  credentialsEnc  String              @map("credentials_enc") @db.Text
+  status          CloudAccountStatus  @default(PENDING)
+  lastSyncAt      DateTime?           @map("last_sync_at")
+  lastSyncError   String?             @map("last_sync_error")
+  syncSchedule    String              @default("0 */6 * * *") @map("sync_schedule")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  costLineItems CostLineItem[]
+  resources     CloudResource[]
+  syncJobs      SyncJob[]
+
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId])
+  @@map("cloud_accounts")
+}
+
+enum CloudProvider {
+  AWS
+  AZURE
+  GCP
+  KUBERNETES
+}
+
+enum CloudAccountStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  DISABLED
+}
+
+// =============================================================================
+// FOCUS-Aligned Cost Data
+// Follows FinOps Foundation FOCUS spec for vendor-neutral cost storage
+// =============================================================================
+
+model CostLineItem {
+  id                  String   @id @default(cuid())
+  tenantId            String   @map("tenant_id")
+  cloudAccountId      String   @map("cloud_account_id")
+
+  // FOCUS Core Columns
+  billingPeriodStart  DateTime @map("billing_period_start")
+  billingPeriodEnd    DateTime @map("billing_period_end")
+  chargeCategory      ChargeCategory @map("charge_category")
+  chargeType          String   @map("charge_type")
+  billedCost          Decimal  @map("billed_cost") @db.Decimal(20, 10)
+  effectiveCost       Decimal  @map("effective_cost") @db.Decimal(20, 10)
+  listCost            Decimal? @map("list_cost") @db.Decimal(20, 10)
+  billingCurrency     String   @default("USD") @map("billing_currency")
+
+  // FOCUS Resource Columns
+  serviceCategory     String?  @map("service_category")
+  serviceName         String?  @map("service_name")
+  regionId            String?  @map("region_id")
+  regionName          String?  @map("region_name")
+  availabilityZone    String?  @map("availability_zone")
+  resourceId          String?  @map("resource_id")
+  resourceName        String?  @map("resource_name")
+  resourceType        String?  @map("resource_type")
+
+  // FOCUS Pricing Columns
+  pricingCategory     String?  @map("pricing_category")
+  pricingQuantity     Decimal? @map("pricing_quantity") @db.Decimal(20, 10)
+  pricingUnit         String?  @map("pricing_unit")
+  usageQuantity       Decimal? @map("usage_quantity") @db.Decimal(20, 10)
+  usageUnit           String?  @map("usage_unit")
+
+  // FOCUS Commitment Columns
+  commitmentDiscountId   String? @map("commitment_discount_id")
+  commitmentDiscountName String? @map("commitment_discount_name")
+  commitmentDiscountType String? @map("commitment_discount_type")
+
+  // Provider-specific (raw data preserved)
+  providerName        String   @map("provider_name")
+  publisherName       String?  @map("publisher_name")
+  invoiceSectionId    String?  @map("invoice_section_id")
+  subAccountId        String?  @map("sub_account_id")
+  subAccountName      String?  @map("sub_account_name")
+
+  // Tags stored as JSON
+  tags                Json     @default("{}")
+
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cloudAccount CloudAccount @relation(fields: [cloudAccountId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, billingPeriodStart])
+  @@index([tenantId, serviceName])
+  @@index([tenantId, providerName, billingPeriodStart])
+  @@index([cloudAccountId, billingPeriodStart])
+  @@index([tenantId, chargeCategory])
+  @@map("cost_line_items")
+}
+
+enum ChargeCategory {
+  USAGE
+  PURCHASE
+  TAX
+  CREDIT
+  ADJUSTMENT
+  SUPPORT
+}
+
+// =============================================================================
+// Cloud Resources Inventory
+// =============================================================================
+
+model CloudResource {
+  id              String        @id @default(cuid())
+  tenantId        String        @map("tenant_id")
+  cloudAccountId  String        @map("cloud_account_id")
+  resourceId      String        @map("resource_id")
+  resourceName    String?       @map("resource_name")
+  resourceType    String        @map("resource_type")
+  provider        CloudProvider
+  region          String?
+  status          String?
+  monthlyCost     Decimal?      @map("monthly_cost") @db.Decimal(20, 10)
+  tags            Json          @default("{}")
+  metadata        Json          @default("{}")
+  firstSeen       DateTime      @default(now()) @map("first_seen")
+  lastSeen        DateTime      @default(now()) @map("last_seen")
+  deletedAt       DateTime?     @map("deleted_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cloudAccount CloudAccount @relation(fields: [cloudAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, resourceId])
+  @@index([tenantId, resourceType])
+  @@index([tenantId, provider])
+  @@index([cloudAccountId])
+  @@map("cloud_resources")
+}
+
+// =============================================================================
+// Budgets & Alerts
+// =============================================================================
+
+model Budget {
+  id            String      @id @default(cuid())
+  tenantId      String      @map("tenant_id")
+  name          String
+  amount        Decimal     @db.Decimal(20, 2)
+  currency      String      @default("USD")
+  period        BudgetPeriod
+  provider      CloudProvider?
+  filters       Json        @default("{}")
+  alertThresholds Int[]     @default([50, 80, 100]) @map("alert_thresholds")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("budgets")
+}
+
+enum BudgetPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// =============================================================================
+// Recommendations (AI + Native provider recommendations)
+// =============================================================================
+
+model Recommendation {
+  id              String                 @id @default(cuid())
+  tenantId        String                 @map("tenant_id")
+  category        RecommendationCategory
+  title           String
+  description     String                 @db.Text
+  provider        CloudProvider
+  resourceIds     String[]               @map("resource_ids")
+  estimatedSavings Decimal               @map("estimated_savings") @db.Decimal(20, 2)
+  currency        String                 @default("USD")
+  severity        Severity
+  status          RecommendationStatus   @default(OPEN)
+  source          String                 @default("nimbus")
+  metadata        Json                   @default("{}")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  resolvedAt      DateTime?              @map("resolved_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@map("recommendations")
+}
+
+enum RecommendationCategory {
+  RIGHTSIZING
+  RESERVED_INSTANCES
+  IDLE_RESOURCES
+  STORAGE_OPTIMIZATION
+  SPOT_INSTANCES
+  NETWORK_OPTIMIZATION
+  OTHER
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum RecommendationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+// =============================================================================
+// Cost Anomalies
+// =============================================================================
+
+model Anomaly {
+  id            String        @id @default(cuid())
+  tenantId      String        @map("tenant_id")
+  title         String
+  description   String        @db.Text
+  provider      CloudProvider
+  serviceName   String?       @map("service_name")
+  expectedCost  Decimal       @map("expected_cost") @db.Decimal(20, 2)
+  actualCost    Decimal       @map("actual_cost") @db.Decimal(20, 2)
+  impact        Decimal       @db.Decimal(20, 2)
+  currency      String        @default("USD")
+  status        AnomalyStatus @default(OPEN)
+  detectedAt    DateTime      @default(now()) @map("detected_at")
+  resolvedAt    DateTime?     @map("resolved_at")
+  metadata      Json          @default("{}")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, detectedAt])
+  @@map("anomalies")
+}
+
+enum AnomalyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+// =============================================================================
+// Governance Policies
+// =============================================================================
+
+model GovernancePolicy {
+  id          String              @id @default(cuid())
+  tenantId    String              @map("tenant_id")
+  name        String
+  description String              @db.Text
+  severity    Severity
+  rules       Json
+  enabled     Boolean             @default(true)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("governance_policies")
+}
+
+// =============================================================================
+// Background Job Tracking
+// =============================================================================
+
+model SyncJob {
+  id              String        @id @default(cuid())
+  cloudAccountId  String        @map("cloud_account_id")
+  jobType         String        @map("job_type")
+  status          SyncJobStatus @default(PENDING)
+  startedAt       DateTime?     @map("started_at")
+  completedAt     DateTime?     @map("completed_at")
+  error           String?       @db.Text
+  metadata        Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  cloudAccount CloudAccount @relation(fields: [cloudAccountId], references: [id], onDelete: Cascade)
+
+  @@index([cloudAccountId, status])
+  @@map("sync_jobs")
+}
+
+enum SyncJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}

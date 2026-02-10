@@ -1,0 +1,73 @@
+replicaCount: 2
+
+image:
+  repository: nimbus/web
+  tag: latest
+  pullPolicy: IfNotPresent
+
+worker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: nimbus/worker
+    tag: latest
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: nimbus.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  web:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+  worker:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+database:
+  url: ''
+  existingSecret: ''
+  secretKey: DATABASE_URL
+
+redis:
+  url: ''
+  existingSecret: ''
+  secretKey: REDIS_URL
+
+auth:
+  secret: ''
+  url: ''
+  existingSecret: ''
+
+encryption:
+  key: ''
+  existingSecret: ''
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
