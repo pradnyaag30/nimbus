@@ -1,4 +1,17 @@
+databases:
+  - name: nimbus-db
+    plan: free
+    databaseName: nimbus
+    user: nimbus
+    postgresMajorVersion: "16"
+
 services:
+  - type: redis
+    name: nimbus-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
   - type: web
     name: nimbus-web
     runtime: node
@@ -12,9 +25,14 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: nimbus-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: nimbus-redis
+          type: redis
+          property: connectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
@@ -34,8 +52,13 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: nimbus-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: nimbus-redis
+          type: redis
+          property: connectionString
       - key: ENCRYPTION_KEY
         sync: false
