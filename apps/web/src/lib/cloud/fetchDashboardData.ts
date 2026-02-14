@@ -46,8 +46,8 @@ export interface DashboardPayload {
   nativeAnomalies: NativeAnomalySummary | null;
 }
 
-// --- In-memory cache (4 hr TTL) — reduces Cost Explorer API calls (~$0.01/req)
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours (testing mode)
+// --- In-memory cache — reduces Cost Explorer API calls (~$0.01/req)
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (testing — minimize API costs before client setup)
 let cachedData: DashboardPayload | null = null;
 let cachedAt = 0;
 

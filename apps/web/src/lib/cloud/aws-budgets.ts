@@ -77,7 +77,7 @@ function mapBudget(budget: Budget): AwsBudget {
 
 // --- Cache -------------------------------------------------------------------
 
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (testing — minimize API costs before client setup)
 let cachedData: AwsBudgetsSummary | null = null;
 let cachedAt = 0;
 
