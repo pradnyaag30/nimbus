@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { Send, X, Bot, User, Sparkles, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -198,6 +198,14 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* CUR integration info */}
+      <div className="flex items-center gap-2 border-t bg-blue-50 px-3 py-1.5 dark:bg-blue-900/20">
+        <Info className="h-3 w-3 shrink-0 text-blue-500" />
+        <p className="text-[10px] text-blue-700 dark:text-blue-300">
+          Powered by AWS Cost Explorer APIs — deep CUR analysis coming soon
+        </p>
       </div>
 
       {/* Input */}

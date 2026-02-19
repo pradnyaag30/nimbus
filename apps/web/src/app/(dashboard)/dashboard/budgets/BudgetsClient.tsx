@@ -1,7 +1,28 @@
 'use client';
 
 import { useCurrency } from '@/components/providers/CurrencyProvider';
-import { AlertTriangle, PlusCircle } from 'lucide-react';
+import { PlusCircle, ExternalLink, AlertTriangle, Target } from 'lucide-react';
+
+// --- Types -------------------------------------------------------------------
+
+interface AwsBudget {
+  budgetName: string;
+  budgetType: string;
+  limitAmount: number;
+  currentSpend: number;
+  forecastedSpend: number;
+  percentUsed: number;
+  alertLevel: 'ok' | 'warning' | 'critical';
+}
+
+interface AwsBudgetsSummary {
+  budgets: AwsBudget[];
+  totalBudgetLimit: number;
+  totalCurrentSpend: number;
+  budgetsInAlarm: number;
+  status: 'active' | 'no-budgets' | 'error';
+  errorMessage?: string;
+}
 
 interface BudgetsClientProps {
   totalSpendMTD: number;
@@ -10,6 +31,7 @@ interface BudgetsClientProps {
   topServices: { name: string; provider: string; cost: number; change: number }[];
   accountId: string;
   error?: string;
+  awsBudgets?: AwsBudgetsSummary | null;
 }
 
 type AlertLevel = 'on-track' | 'normal' | 'warning' | 'critical';
@@ -51,6 +73,7 @@ export function BudgetsClient({
   topServices,
   accountId,
   error,
+  awsBudgets,
 }: BudgetsClientProps) {
   const { format } = useCurrency();
 
@@ -70,27 +93,19 @@ export function BudgetsClient({
     );
   }
 
-  // Derive budgets from real data — overall account + top 3 services
   const dayOfMonth = new Date().getDate();
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const burnRate = totalSpendMTD / Math.max(dayOfMonth, 1);
 
-  const budgets = [
-    {
-      name: 'AWS Total (Account)',
-      provider: 'AWS',
-      limit: previousMonthTotal > 0 ? previousMonthTotal * 1.1 : forecastedSpend * 1.1,
-      spent: totalSpendMTD,
-      projected: forecastedSpend,
-    },
-    ...topServices.slice(0, 3).map((s) => ({
-      name: s.name,
-      provider: s.provider,
-      limit: s.cost * (daysInMonth / Math.max(dayOfMonth, 1)) * 1.1,
-      spent: s.cost,
-      projected: s.cost * (daysInMonth / Math.max(dayOfMonth, 1)),
-    })),
-  ];
+  const hasRealBudgets = awsBudgets?.status === 'active' && awsBudgets.budgets.length > 0;
+
+  const handleCreateBudget = () => {
+    window.open(
+      'https://console.aws.amazon.com/billing/home#/budgets/create',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
 
   return (
     <div className="space-y-6 animate-in">
@@ -101,9 +116,13 @@ export function BudgetsClient({
             Budget tracking for AWS Account {accountId} — Day {dayOfMonth}/{daysInMonth}
           </p>
         </div>
-        <button className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+        <button
+          onClick={handleCreateBudget}
+          className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+        >
           <PlusCircle className="h-4 w-4" />
           Create Budget
+          <ExternalLink className="h-3 w-3" />
         </button>
       </div>
 
@@ -123,70 +142,109 @@ export function BudgetsClient({
         </div>
       </div>
 
-      {/* Budget cards with multi-level thresholds */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {budgets.map((budget) => {
-          const percentage = (budget.spent / budget.limit) * 100;
-          const projectedPct = (budget.projected / budget.limit) * 100;
-          const alertLevel = getAlertLevel(percentage);
-          const willExceed = projectedPct > 100 && alertLevel !== 'critical';
-          const ac = alertConfig[alertLevel];
+      {/* Real AWS Budgets or No-Budget CTA */}
+      {hasRealBudgets ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {awsBudgets.budgets.map((budget) => {
+            const percentage = budget.percentUsed;
+            const projectedPct = budget.limitAmount > 0
+              ? (budget.forecastedSpend / budget.limitAmount) * 100
+              : 0;
+            const alertLevel = getAlertLevel(percentage);
+            const willExceed = projectedPct > 100 && alertLevel !== 'critical';
+            const ac = alertConfig[alertLevel];
 
-          return (
-            <div key={budget.name} className="rounded-xl border bg-card p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">{budget.name}</h3>
-                  <p className="text-xs text-muted-foreground">{budget.provider}</p>
-                </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ac.badge}`}>
-                  {willExceed ? 'Will Exceed' : ac.label}
-                </span>
-              </div>
-              <div className="mt-4">
-                <div className="flex justify-between text-sm">
-                  <span>{format(budget.spent)} spent</span>
-                  <span className="text-muted-foreground">{format(budget.limit)} limit</span>
-                </div>
-                {/* Progress bar with threshold markers */}
-                <div className="relative mt-2">
-                  <div className="h-2.5 rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-all ${ac.bar}`}
-                      style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
+            return (
+              <div key={budget.budgetName} className="rounded-xl border bg-card p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{budget.budgetName}</h3>
+                    <p className="text-xs text-muted-foreground">{budget.budgetType}</p>
                   </div>
-                  {/* Threshold markers at 50%, 80%, 100% */}
-                  <div className="absolute top-0 h-2.5 w-px bg-blue-500/40" style={{ left: '50%' }} title="50%" />
-                  <div className="absolute top-0 h-2.5 w-px bg-yellow-500/60" style={{ left: '80%' }} title="80% Warning" />
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ac.badge}`}>
+                    {willExceed ? 'Will Exceed' : ac.label}
+                  </span>
                 </div>
-                <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
-                  <span>{percentage.toFixed(1)}% used</span>
-                  {willExceed && (
-                    <span className="text-yellow-600 dark:text-yellow-400">Projected to exceed</span>
-                  )}
-                  <span>Projected: {format(budget.projected)}</span>
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm">
+                    <span>{format(budget.currentSpend)} spent</span>
+                    <span className="text-muted-foreground">{format(budget.limitAmount)} limit</span>
+                  </div>
+                  {/* Progress bar with threshold markers */}
+                  <div className="relative mt-2">
+                    <div className="h-2.5 rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full transition-all ${ac.bar}`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                    <div className="absolute top-0 h-2.5 w-px bg-blue-500/40" style={{ left: '50%' }} title="50%" />
+                    <div className="absolute top-0 h-2.5 w-px bg-yellow-500/60" style={{ left: '80%' }} title="80% Warning" />
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+                    <span>{percentage.toFixed(1)}% used</span>
+                    {willExceed && (
+                      <span className="text-yellow-600 dark:text-yellow-400">Projected to exceed</span>
+                    )}
+                    <span>Forecast: {format(budget.forecastedSpend)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card p-8 text-center shadow-sm">
+          <Target className="mx-auto h-10 w-10 text-muted-foreground/30" />
+          <h3 className="mt-3 font-semibold">No AWS Budgets Configured</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Create your first budget in AWS to get threshold alerts and accurate budget tracking.
+            Nimbus will automatically sync your budgets.
+          </p>
+          <button
+            onClick={handleCreateBudget}
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Create Budget in AWS
+            <ExternalLink className="h-3 w-3" />
+          </button>
+
+          {/* Forecast-based summary when no budgets */}
+          {forecastedSpend > 0 && (
+            <div className="mx-auto mt-6 max-w-md rounded-lg border p-4 text-left">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                Spend Overview (No Budget Set)
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">MTD Spend</p>
+                  <p className="mt-0.5 text-sm font-bold">{format(totalSpendMTD)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Forecast</p>
+                  <p className="mt-0.5 text-sm font-bold">{format(forecastedSpend)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last Month</p>
+                  <p className="mt-0.5 text-sm font-bold">{format(previousMonthTotal)}</p>
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Alert threshold legend */}
-      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500" />On Track (&lt;50%)</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" />Normal (50-80%)</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-yellow-500" />Warning (80-100%)</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />Critical (&gt;100%)</span>
-      </div>
-
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          <strong>Auto-budgets:</strong> Budgets are auto-calculated at 110% of previous month or forecasted spend.
-          Custom budgets with email alerts can be configured via AWS Budgets in the AWS Console.
-        </p>
-      </div>
+      {hasRealBudgets && (
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500" />On Track (&lt;50%)</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" />Normal (50-80%)</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-yellow-500" />Warning (80-100%)</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />Critical (&gt;100%)</span>
+        </div>
+      )}
     </div>
   );
 }

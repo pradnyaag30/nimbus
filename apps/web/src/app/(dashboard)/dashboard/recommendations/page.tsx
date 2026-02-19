@@ -25,6 +25,9 @@ export default async function RecommendationsPage() {
       optimizerStatus={optimizer?.optimizerStatus ?? 'error'}
       optimizerSavings={optimizer?.totalEstimatedSavings ?? 0}
       optimizerErrorMessage={optimizer?.errorMessage}
+      ceRightsizing={data.ceRightsizing}
+      riRecommendations={data.riRecommendations}
+      spRecommendations={data.spRecommendations}
     />
   );
 }

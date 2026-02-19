@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import {
   ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle,
   DollarSign, Cpu, Shield, Activity, Server, Info,
+  ChevronDown, ChevronRight, ExternalLink, Loader2,
 } from 'lucide-react';
 import { useCurrency } from '@/components/providers/CurrencyProvider';
 
@@ -35,6 +37,21 @@ interface TrustedAdvisorSummary {
   totalEstimatedSavings: number;
   status: 'active' | 'not-entitled' | 'error';
   errorMessage?: string;
+}
+
+interface FlaggedResource {
+  resourceId: string;
+  status: string;
+  region: string;
+  metadata: string[];
+}
+
+interface CheckDetail {
+  checkId: string;
+  name: string;
+  category: string;
+  flaggedResources: FlaggedResource[];
+  headers: string[];
 }
 
 interface TrustedAdvisorClientProps {
@@ -101,6 +118,285 @@ function getScoreBg(score: CategoryScore): string {
 
 function formatCategoryLabel(key: string): string {
   return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Build AWS Console link for a Trusted Advisor category */
+function getTrustedAdvisorCategoryUrl(categoryKey: string): string {
+  const categoryMap: Record<string, string> = {
+    cost_optimizing: 'cost-optimization',
+    security: 'security',
+    fault_tolerance: 'fault-tolerance',
+    performance: 'performance',
+    service_limits: 'service-limits',
+  };
+  const slug = categoryMap[categoryKey] ?? 'cost-optimization';
+  return `https://console.aws.amazon.com/trustedadvisor/home#/category/${slug}`;
+}
+
+/** Build a remediation hint from the check name and category */
+function getRemediationHint(check: TrustedAdvisorCheck): string {
+  const { name, category, status } = check;
+  if (status === 'ok') return 'This check is currently passing. No action needed.';
+
+  const lowerName = name.toLowerCase();
+
+  // Cost optimization checks
+  if (category === 'cost_optimizing') {
+    if (lowerName.includes('idle') || lowerName.includes('underutilized'))
+      return 'Consider stopping or right-sizing these resources to reduce costs. Review usage patterns before terminating.';
+    if (lowerName.includes('reserved instance') || lowerName.includes('ri '))
+      return 'Review your Reserved Instance usage. Consider purchasing or modifying RIs to match your current workload.';
+    if (lowerName.includes('savings plan'))
+      return 'Evaluate Savings Plans coverage. Consider purchasing Compute or EC2 Savings Plans for consistent workloads.';
+    return 'Review the flagged resources and consider whether they can be optimized or eliminated to reduce costs.';
+  }
+
+  // Security checks
+  if (category === 'security') {
+    if (lowerName.includes('mfa'))
+      return 'Enable Multi-Factor Authentication on all IAM users, especially root. Use hardware MFA for root account.';
+    if (lowerName.includes('security group'))
+      return 'Review security group rules and restrict overly permissive access. Avoid 0.0.0.0/0 on sensitive ports.';
+    if (lowerName.includes('iam'))
+      return 'Review IAM policies and remove unused credentials. Apply the principle of least privilege.';
+    if (lowerName.includes('s3') || lowerName.includes('bucket'))
+      return 'Review S3 bucket policies and ACLs. Ensure buckets are not publicly accessible unless intended.';
+    return 'Review the flagged security findings and apply AWS security best practices to remediate.';
+  }
+
+  // Fault tolerance
+  if (category === 'fault_tolerance') {
+    if (lowerName.includes('backup') || lowerName.includes('snapshot'))
+      return 'Ensure regular backups are configured. Set up automated EBS snapshots or RDS automated backups.';
+    if (lowerName.includes('multi-az') || lowerName.includes('availability zone'))
+      return 'Deploy resources across multiple Availability Zones for high availability.';
+    return 'Review the flagged resources to improve fault tolerance and disaster recovery posture.';
+  }
+
+  // Performance
+  if (category === 'performance') {
+    if (lowerName.includes('provisioned') || lowerName.includes('throughput'))
+      return 'Review provisioned capacity. Consider auto-scaling or adjusting throughput to match demand.';
+    return 'Review the flagged resources and consider optimizations to improve performance.';
+  }
+
+  // Service limits
+  if (category === 'service_limits') {
+    return 'You are approaching or have reached a service limit. Request a limit increase via AWS Service Quotas.';
+  }
+
+  return 'Review the flagged resources in the AWS Console and take appropriate action.';
+}
+
+// --- Expandable Check Row ---------------------------------------------------
+
+function ExpandableCheckRow({ check }: { check: TrustedAdvisorCheck }) {
+  const { format } = useCurrency();
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<CheckDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const style = statusStyles[check.status] || statusStyles.not_available;
+  const StatusIcon = getStatusIcon(check.status);
+
+  const handleToggle = useCallback(async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+
+    setExpanded(true);
+
+    // Only fetch if we haven't already
+    if (!detail && !loading) {
+      setLoading(true);
+      setFetchError(null);
+      try {
+        const res = await fetch(`/api/trusted-advisor?checkId=${encodeURIComponent(check.checkId)}`);
+        if (!res.ok) throw new Error('Failed to fetch check details');
+        const data: CheckDetail = await res.json();
+        setDetail(data);
+      } catch (err) {
+        setFetchError(err instanceof Error ? err.message : 'Failed to load details');
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [expanded, detail, loading, check.checkId]);
+
+  const consoleUrl = getTrustedAdvisorCategoryUrl(check.category);
+  const remediation = getRemediationHint(check);
+
+  // Filter out "ok" resources — only show warning/error flagged ones
+  const flaggedNonOk = detail?.flaggedResources.filter((r) => r.status !== 'ok') ?? [];
+  const flaggedCount = flaggedNonOk.length;
+
+  return (
+    <>
+      {/* Main row */}
+      <tr
+        className="border-b last:border-0 hover:bg-muted/50 cursor-pointer group"
+        onClick={handleToggle}
+      >
+        <td className="px-6 py-3">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg}`}>
+            <StatusIcon className="h-3 w-3" />
+            {style.label}
+          </span>
+        </td>
+        <td className="px-6 py-3">
+          <div className="flex items-center gap-2">
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            )}
+            <span className="text-sm">{check.name}</span>
+          </div>
+        </td>
+        <td className="px-6 py-3">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {formatCategoryLabel(check.category)}
+          </span>
+        </td>
+        <td className="px-6 py-3 text-right">
+          {check.category === 'cost_optimizing' && check.estimatedMonthlySavings > 0 ? (
+            <span className="text-sm font-medium text-green-600 dark:text-green-400">
+              {format(check.estimatedMonthlySavings)}/mo
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">--</span>
+          )}
+        </td>
+        <td className="px-3 py-3">
+          <a
+            href={consoleUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" />
+            <span className="hidden sm:inline">View in AWS</span>
+          </a>
+        </td>
+      </tr>
+
+      {/* Expanded detail panel */}
+      {expanded && (
+        <tr className="border-b last:border-0">
+          <td colSpan={5} className="px-6 py-4 bg-muted/30">
+            <div className="space-y-3">
+              {/* Remediation guidance */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                <p className="text-xs font-medium text-blue-800 dark:text-blue-200">Recommended Action</p>
+                <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">{remediation}</p>
+              </div>
+
+              {/* Loading state */}
+              {loading && (
+                <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading flagged resources...
+                </div>
+              )}
+
+              {/* Error state */}
+              {fetchError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+                  <p className="text-xs text-red-700 dark:text-red-300">{fetchError}</p>
+                </div>
+              )}
+
+              {/* Flagged resources table */}
+              {detail && flaggedCount > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    {flaggedCount} flagged resource{flaggedCount !== 1 ? 's' : ''} requiring attention
+                  </p>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          {detail.headers.slice(0, 5).map((header, i) => (
+                            <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">
+                              {header}
+                            </th>
+                          ))}
+                          <th className="px-3 py-2 text-left font-medium text-muted-foreground">Region</th>
+                          <th className="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {flaggedNonOk.slice(0, 10).map((resource, idx) => {
+                          const resourceStatusStyle =
+                            resource.status === 'error' || resource.status === 'warning'
+                              ? statusStyles[resource.status]
+                              : statusStyles.not_available;
+
+                          return (
+                            <tr key={idx} className="border-b last:border-0">
+                              {detail.headers.slice(0, 5).map((_, hIdx) => (
+                                <td key={hIdx} className="px-3 py-2 max-w-[200px] truncate">
+                                  {resource.metadata[hIdx] || '--'}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2">{resource.region || '--'}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${resourceStatusStyle.bg}`}>
+                                  {resourceStatusStyle.label}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {flaggedNonOk.length > 10 && (
+                      <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+                        Showing 10 of {flaggedNonOk.length} flagged resources.{' '}
+                        <a
+                          href={consoleUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          View all in AWS Console
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* No flagged resources */}
+              {detail && flaggedCount === 0 && !loading && (
+                <p className="text-xs text-muted-foreground">
+                  {check.status === 'ok'
+                    ? 'All resources are passing this check.'
+                    : 'No specific flagged resources returned by AWS for this check.'}
+                </p>
+              )}
+
+              {/* View in AWS link at bottom of detail */}
+              <div className="flex items-center justify-end">
+                <a
+                  href={consoleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in AWS Trusted Advisor
+                </a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
 }
 
 // --- Not Entitled State ------------------------------------------------------
@@ -217,11 +513,22 @@ export function TrustedAdvisorClient({ data }: TrustedAdvisorClientProps) {
   return (
     <div className="space-y-6 animate-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Trusted Advisor</h1>
-        <p className="text-sm text-muted-foreground">
-          AWS best-practice checks — {totalChecks} checks evaluated across 5 pillars
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Trusted Advisor</h1>
+          <p className="text-sm text-muted-foreground">
+            AWS best-practice checks — {totalChecks} checks evaluated across 5 pillars
+          </p>
+        </div>
+        <a
+          href="https://console.aws.amazon.com/trustedadvisor/home"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Open AWS Trusted Advisor
+        </a>
       </div>
 
       {/* KPI Cards */}
@@ -286,12 +593,22 @@ export function TrustedAdvisorClient({ data }: TrustedAdvisorClientProps) {
           const total = score.ok + score.warning + score.error;
           const okPercent = total > 0 ? (score.ok / total) * 100 : 100;
           const CatIcon = cat.icon;
+          const categoryUrl = getTrustedAdvisorCategoryUrl(cat.key);
 
           return (
-            <div key={cat.key} className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <CatIcon className={`h-4 w-4 ${cat.color}`} />
-                <h3 className="text-sm font-semibold">{cat.label}</h3>
+            <a
+              key={cat.key}
+              href={categoryUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group rounded-xl border bg-card p-5 shadow-sm hover:border-primary/50 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CatIcon className={`h-4 w-4 ${cat.color}`} />
+                  <h3 className="text-sm font-semibold">{cat.label}</h3>
+                </div>
+                <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
 
               <div className="space-y-2 text-xs">
@@ -326,17 +643,17 @@ export function TrustedAdvisorClient({ data }: TrustedAdvisorClientProps) {
                   {format(score.estimatedSavings)}/mo savings
                 </p>
               )}
-            </div>
+            </a>
           );
         })}
       </div>
 
-      {/* Full Checks Table */}
+      {/* Full Checks Table — Expandable */}
       <div className="rounded-xl border bg-card shadow-sm">
         <div className="p-6 pb-3">
           <h3 className="font-semibold">All Checks</h3>
           <p className="text-sm text-muted-foreground">
-            Full list of Trusted Advisor checks sorted by severity.
+            Click any check to see details, flagged resources, and remediation guidance.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -347,46 +664,16 @@ export function TrustedAdvisorClient({ data }: TrustedAdvisorClientProps) {
                 <th className="px-6 py-3 font-medium text-muted-foreground">Check Name</th>
                 <th className="px-6 py-3 font-medium text-muted-foreground">Category</th>
                 <th className="px-6 py-3 text-right font-medium text-muted-foreground">Savings</th>
+                <th className="px-3 py-3 font-medium text-muted-foreground">AWS</th>
               </tr>
             </thead>
             <tbody>
-              {sortedChecks.map((check) => {
-                const style = statusStyles[check.status] || statusStyles.not_available;
-                const StatusIcon = getStatusIcon(check.status);
-
-                return (
-                  <tr key={check.checkId} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-6 py-3">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg}`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {style.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className="text-sm">{check.name}</span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {formatCategoryLabel(check.category)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      {check.category === 'cost_optimizing' && check.estimatedMonthlySavings > 0 ? (
-                        <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                          {format(check.estimatedMonthlySavings)}/mo
-                        </span>
-                      ) : check.category === 'cost_optimizing' ? (
-                        <span className="text-xs text-muted-foreground">--</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">--</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {sortedChecks.map((check) => (
+                <ExpandableCheckRow key={check.checkId} check={check} />
+              ))}
               {sortedChecks.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
                     No Trusted Advisor checks found.
                   </td>
                 </tr>
@@ -404,7 +691,8 @@ export function TrustedAdvisorClient({ data }: TrustedAdvisorClientProps) {
             Powered by AWS Trusted Advisor
           </p>
           <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-            Checks are refreshed automatically. Trusted Advisor evaluates your AWS account against best practices
+            Checks are refreshed automatically. Click any check to see affected resources and recommended actions.
+            Trusted Advisor evaluates your AWS account against best practices
             across cost optimization, security, performance, fault tolerance, and service limits.
             Requires AWS Business or Enterprise Support plan for full access.
           </p>

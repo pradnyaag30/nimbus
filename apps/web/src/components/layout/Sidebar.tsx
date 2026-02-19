@@ -36,7 +36,7 @@ const navigation = [
 const secondaryNav = [
   { name: 'Governance', href: '/dashboard/governance', icon: Shield },
   { name: 'Tag Governance', href: '/dashboard/tag-governance', icon: Tag },
-  { name: 'NOC / TV Mode', href: '/dashboard/tv', icon: Monitor },
+  { name: 'Executive Dashboard', href: '/dashboard/tv', icon: Monitor },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 

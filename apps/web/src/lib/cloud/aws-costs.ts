@@ -4,8 +4,11 @@ import {
   GetCostForecastCommand,
   GetRightsizingRecommendationCommand,
   GetReservationPurchaseRecommendationCommand,
+  GetReservationCoverageCommand,
+  GetReservationUtilizationCommand,
   GetSavingsPlansPurchaseRecommendationCommand,
   GetSavingsPlansUtilizationCommand,
+  GetSavingsPlansCoverageCommand,
   GetAnomalyMonitorsCommand,
   GetAnomaliesCommand,
   type GetCostAndUsageCommandInput,
@@ -198,6 +201,7 @@ export async function getDataTransferCosts(): Promise<DataTransferCost[]> {
   const previousMonthStart = new Date(currentMonthStart);
   previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
 
+  // Broader set of usage type groups to capture all data transfer categories
   const usageTypeGroups = [
     'EC2: Data Transfer - Internet (Out)',
     'EC2: Data Transfer - Inter AZ',
@@ -205,6 +209,10 @@ export async function getDataTransferCosts(): Promise<DataTransferCost[]> {
     'S3: Data Transfer - Internet (Out)',
     'CloudFront: Data Transfer - Internet (Out)',
     'RDS: Data Transfer - Internet (Out)',
+    'EC2: Data Transfer - CloudFront (Out)',
+    'S3: Data Transfer - Inter AZ',
+    'ElastiCache: Data Transfer - Inter AZ',
+    'RDS: Data Transfer - Inter AZ',
   ];
 
   const [currentRes, previousRes] = await Promise.all([
@@ -248,6 +256,8 @@ export async function getDataTransferCosts(): Promise<DataTransferCost[]> {
 export interface CommitmentCoverage {
   savingsPlansCoveragePercent: number;
   savingsPlansUtilizationPercent: number;
+  reservedInstanceCoveragePercent: number;
+  reservedInstanceUtilizationPercent: number;
   totalOnDemandCost: number;
   totalCommittedCost: number;
   estimatedSavingsFromCommitments: number;
@@ -257,17 +267,21 @@ export async function getCommitmentCoverage(): Promise<CommitmentCoverage> {
   const client = createCostExplorerClient();
   const now = new Date();
   const currentMonthStart = getMonthStart(now);
+  const timePeriod = { Start: formatDate(currentMonthStart), End: formatDate(now) };
 
   try {
-    // Fetch purchase-type breakdown AND real Savings Plans utilization in parallel
-    const [purchaseTypeResponse, spUtilization] = await Promise.all([
+    // Fetch all coverage & utilization data in parallel
+    const [purchaseTypeResponse, spUtilization, spCoverage, riCoverage, riUtilization] = await Promise.all([
       client.send(new GetCostAndUsageCommand({
-        TimePeriod: { Start: formatDate(currentMonthStart), End: formatDate(now) },
+        TimePeriod: timePeriod,
         Granularity: 'MONTHLY',
         Metrics: ['UnblendedCost', 'AmortizedCost'],
         GroupBy: [{ Type: 'DIMENSION', Key: 'PURCHASE_TYPE' }],
       })),
       getRealSPUtilization(client, currentMonthStart, now),
+      getRealSPCoverage(client, currentMonthStart, now),
+      getRealRICoverage(client, currentMonthStart, now),
+      getRealRIUtilization(client, currentMonthStart, now),
     ]);
 
     let onDemandCost = 0;
@@ -284,12 +298,11 @@ export async function getCommitmentCoverage(): Promise<CommitmentCoverage> {
       }
     }
 
-    const totalCost = onDemandCost + committedCost;
-    const coveragePercent = totalCost > 0 ? (committedCost / totalCost) * 100 : 0;
-
     return {
-      savingsPlansCoveragePercent: coveragePercent,
+      savingsPlansCoveragePercent: spCoverage,
       savingsPlansUtilizationPercent: spUtilization,
+      reservedInstanceCoveragePercent: riCoverage,
+      reservedInstanceUtilizationPercent: riUtilization,
       totalOnDemandCost: onDemandCost,
       totalCommittedCost: committedCost,
       estimatedSavingsFromCommitments: spUtilization > 0 ? committedCost * (spUtilization / 100) * 0.25 : 0,
@@ -298,6 +311,8 @@ export async function getCommitmentCoverage(): Promise<CommitmentCoverage> {
     return {
       savingsPlansCoveragePercent: 0,
       savingsPlansUtilizationPercent: 0,
+      reservedInstanceCoveragePercent: 0,
+      reservedInstanceUtilizationPercent: 0,
       totalOnDemandCost: 0,
       totalCommittedCost: 0,
       estimatedSavingsFromCommitments: 0,
@@ -323,6 +338,78 @@ async function getRealSPUtilization(
     return pct;
   } catch (error) {
     console.error('[CommitmentCoverage] SP utilization API failed:', error);
+    return 0;
+  }
+}
+
+/** Fetch real Savings Plans coverage percentage from the CE API. */
+async function getRealSPCoverage(
+  client: CostExplorerClient,
+  periodStart: Date,
+  periodEnd: Date,
+): Promise<number> {
+  try {
+    const response = await client.send(new GetSavingsPlansCoverageCommand({
+      TimePeriod: {
+        Start: formatDate(periodStart),
+        End: formatDate(periodEnd),
+      },
+    }));
+
+    const pct = parseFloat(
+      response.SavingsPlansCoverages?.[0]?.Coverage?.CoveragePercentage ?? '0',
+    );
+    return pct;
+  } catch (error) {
+    console.error('[CommitmentCoverage] SP coverage API failed:', error);
+    return 0;
+  }
+}
+
+/** Fetch real Reserved Instance coverage percentage from the CE API. */
+async function getRealRICoverage(
+  client: CostExplorerClient,
+  periodStart: Date,
+  periodEnd: Date,
+): Promise<number> {
+  try {
+    const response = await client.send(new GetReservationCoverageCommand({
+      TimePeriod: {
+        Start: formatDate(periodStart),
+        End: formatDate(periodEnd),
+      },
+    }));
+
+    const total = response.Total?.CoverageHours;
+    if (total) {
+      const pct = parseFloat(total.CoverageHoursPercentage ?? '0');
+      return pct;
+    }
+    return 0;
+  } catch (error) {
+    console.error('[CommitmentCoverage] RI coverage API failed:', error);
+    return 0;
+  }
+}
+
+/** Fetch real Reserved Instance utilization percentage from the CE API. */
+async function getRealRIUtilization(
+  client: CostExplorerClient,
+  periodStart: Date,
+  periodEnd: Date,
+): Promise<number> {
+  try {
+    const response = await client.send(new GetReservationUtilizationCommand({
+      TimePeriod: {
+        Start: formatDate(periodStart),
+        End: formatDate(periodEnd),
+      },
+    }));
+
+    const total = response.Total?.UtilizationPercentage;
+    return total ? parseFloat(total) : 0;
+  } catch (error) {
+    console.error('[CommitmentCoverage] RI utilization API failed:', error);
     return 0;
   }
 }

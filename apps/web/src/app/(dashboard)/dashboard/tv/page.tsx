@@ -1,7 +1,7 @@
 import { getDashboardData } from '@/lib/cloud/fetchDashboardData';
 import { TvDashboard } from './TvDashboard';
 
-export const metadata = { title: 'NOC Dashboard' };
+export const metadata = { title: 'Executive Dashboard' };
 export const dynamic = 'force-dynamic';
 
 export default async function TvPage() {

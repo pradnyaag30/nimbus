@@ -80,11 +80,13 @@ export function BurnRateCard({
 
   const currentBurnRate = totalSpendMTD / Math.max(dayOfMonth, 1);
 
-  // Use real AWS Budgets when available, otherwise fall back to prev month + 10%
-  const budget =
-    awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0
-      ? awsBudgets.totalBudgetLimit
-      : previousMonthTotal * 1.1;
+  // Use real AWS Budgets when available, otherwise use AWS Cost Forecast
+  const hasRealBudget = awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0;
+  const budget = hasRealBudget
+    ? awsBudgets.totalBudgetLimit
+    : forecastedSpend > 0
+      ? forecastedSpend
+      : previousMonthTotal;
   const budgetRemaining = Math.max(budget - totalSpendMTD, 0);
   const requiredBurnRate = daysRemaining > 0 ? budgetRemaining / daysRemaining : 0;
 
@@ -157,7 +159,7 @@ export function BurnRateCard({
 
       {/* Budget */}
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Budget (prev +10%)</span>
+        <span className="text-muted-foreground">{hasRealBudget ? 'AWS Budget' : 'Forecast Target'}</span>
         <span className="font-medium">{format(budget)}</span>
       </div>
 

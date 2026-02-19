@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import {
-  Lightbulb, Server, Zap, HardDrive, Globe, Workflow,
-  TrendingDown, Info, Cpu, Database, CheckCircle, Clock, AlertTriangle,
+  Lightbulb, Server, Zap, ExternalLink,
+  CheckCircle, Clock, AlertTriangle, Cpu, Database, ArrowRight,
 } from 'lucide-react';
 import { useCurrency } from '@/components/providers/CurrencyProvider';
 
@@ -21,6 +21,24 @@ interface OptimizationRecommendation {
   region: string;
 }
 
+interface CERightsizingRecommendation {
+  instanceId: string;
+  instanceType: string;
+  action: string;
+  targetInstanceType: string;
+  estimatedMonthlySavings: number;
+}
+
+interface RIPurchaseRecommendation {
+  instanceType: string;
+  estimatedMonthlySavings: number;
+}
+
+interface SPPurchaseRecommendation {
+  savingsPlanType: string;
+  estimatedMonthlySavings: number;
+}
+
 interface RecommendationsClientProps {
   topServices: { name: string; provider: string; cost: number; change: number }[];
   totalSpendMTD: number;
@@ -31,126 +49,12 @@ interface RecommendationsClientProps {
   optimizerStatus: 'active' | 'collecting' | 'not-enrolled' | 'error';
   optimizerSavings: number;
   optimizerErrorMessage?: string;
-}
-
-// --- Cost-pattern derived recommendations ------------------------------------
-
-interface CostRecommendation {
-  category: string;
-  description: string;
-  icon: typeof Lightbulb;
-  savings: number;
-  count: number;
-  severity: 'high' | 'medium' | 'low';
-  services: string[];
-}
-
-function deriveRecommendations(
-  topServices: { name: string; provider: string; cost: number; change: number }[],
-  totalSpendMTD: number,
-): CostRecommendation[] {
-  const recs: CostRecommendation[] = [];
-
-  const computeServices = topServices.filter((s) =>
-    /ec2|compute|instance|lambda|fargate|ecs/i.test(s.name),
-  );
-  if (computeServices.length > 0) {
-    const computeCost = computeServices.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Rightsizing',
-      description: 'Analyze EC2/Lambda utilization and downsize over-provisioned resources to match actual usage',
-      icon: Server,
-      savings: computeCost * 0.15,
-      count: computeServices.length,
-      severity: computeCost > totalSpendMTD * 0.3 ? 'high' : 'medium',
-      services: computeServices.map((s) => s.name),
-    });
-  }
-
-  const stableCompute = topServices.filter((s) => Math.abs(s.change) < 20 && s.cost > 1);
-  if (stableCompute.length > 0) {
-    const stableCost = stableCompute.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Savings Plans',
-      description: 'Commit to 1-3 year terms for stable workloads — up to 40% savings vs on-demand',
-      icon: Zap,
-      savings: stableCost * 0.30,
-      count: stableCompute.length,
-      severity: 'high',
-      services: stableCompute.slice(0, 5).map((s) => s.name),
-    });
-  }
-
-  const storageServices = topServices.filter((s) =>
-    /s3|storage|ebs|efs|glacier|backup|snapshot/i.test(s.name),
-  );
-  if (storageServices.length > 0) {
-    const storageCost = storageServices.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Storage Optimization',
-      description: 'Move infrequently accessed data to S3 Intelligent-Tiering or Glacier; clean up old snapshots',
-      icon: HardDrive,
-      savings: storageCost * 0.20,
-      count: storageServices.length,
-      severity: storageCost > totalSpendMTD * 0.15 ? 'high' : 'medium',
-      services: storageServices.map((s) => s.name),
-    });
-  }
-
-  const networkServices = topServices.filter((s) =>
-    /transfer|cloudfront|nat|vpc|route|elb|load|api gateway/i.test(s.name),
-  );
-  if (networkServices.length > 0) {
-    const networkCost = networkServices.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Network Optimization',
-      description: 'Use VPC endpoints, optimize CloudFront caching, review NAT gateway data transfer',
-      icon: Globe,
-      savings: networkCost * 0.20,
-      count: networkServices.length,
-      severity: 'medium',
-      services: networkServices.map((s) => s.name),
-    });
-  }
-
-  const spikingServices = topServices.filter((s) => s.change > 25);
-  if (spikingServices.length > 0) {
-    const spikeCost = spikingServices.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Anomaly Investigation',
-      description: 'Services with >25% MoM cost increase — may indicate waste, misconfig, or unexpected scaling',
-      icon: Workflow,
-      savings: spikeCost * 0.30,
-      count: spikingServices.length,
-      severity: 'high',
-      services: spikingServices.map((s) => s.name),
-    });
-  }
-
-  const tinyServices = topServices.filter((s) => s.cost > 0 && s.cost < totalSpendMTD * 0.01);
-  if (tinyServices.length > 3) {
-    const tinyCost = tinyServices.reduce((s, c) => s + c.cost, 0);
-    recs.push({
-      category: 'Idle Resource Cleanup',
-      description: 'Low-cost services may indicate unused or orphaned resources — quick win with zero performance impact',
-      icon: TrendingDown,
-      savings: tinyCost * 0.50,
-      count: tinyServices.length,
-      severity: 'low',
-      services: tinyServices.slice(0, 5).map((s) => s.name),
-    });
-  }
-
-  return recs.sort((a, b) => b.savings - a.savings);
+  ceRightsizing: CERightsizingRecommendation[];
+  riRecommendations: RIPurchaseRecommendation[];
+  spRecommendations: SPPurchaseRecommendation[];
 }
 
 // --- Styles ------------------------------------------------------------------
-
-const severityStyles = {
-  high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-};
 
 const riskStyles: Record<string, string> = {
   VeryLow: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -166,6 +70,8 @@ const typeIcons: Record<string, typeof Cpu> = {
   EBS: Database,
 };
 
+type TabKey = 'optimizer' | 'rightsizing' | 'ri-sp';
+
 // --- Component ---------------------------------------------------------------
 
 export function RecommendationsClient({
@@ -178,9 +84,12 @@ export function RecommendationsClient({
   optimizerStatus,
   optimizerSavings,
   optimizerErrorMessage,
+  ceRightsizing,
+  riRecommendations,
+  spRecommendations,
 }: RecommendationsClientProps) {
   const { format } = useCurrency();
-  const [activeTab, setActiveTab] = useState<'optimizer' | 'patterns'>('optimizer');
+  const [activeTab, setActiveTab] = useState<TabKey>('optimizer');
 
   if (error || totalSpendMTD === 0) {
     return (
@@ -202,9 +111,10 @@ export function RecommendationsClient({
     );
   }
 
-  const costRecs = deriveRecommendations(topServices, totalSpendMTD);
-  const costSavings = costRecs.reduce((sum, r) => sum + r.savings, 0);
-  const totalSavings = optimizerSavings + costSavings;
+  const ceSavings = ceRightsizing.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+  const riSavings = riRecommendations.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+  const spSavings = spRecommendations.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+  const totalSavings = optimizerSavings + ceSavings + riSavings + spSavings;
 
   return (
     <div className="space-y-6 animate-in">
@@ -232,8 +142,11 @@ export function RecommendationsClient({
           </p>
         </div>
         <div className="rounded-xl border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Rightsizing Opportunities</p>
-          <p className="mt-1 text-3xl font-bold">{optimizerRecs.length}</p>
+          <p className="text-sm text-muted-foreground">CE Rightsizing + RI/SP</p>
+          <p className="mt-1 text-3xl font-bold text-green-600 dark:text-green-400">
+            {format(ceSavings + riSavings + spSavings)}
+            <span className="text-base font-normal text-muted-foreground">/mo</span>
+          </p>
         </div>
         <div className="rounded-xl border bg-card p-6">
           <p className="text-sm text-muted-foreground">Annualized Savings</p>
@@ -284,7 +197,7 @@ export function RecommendationsClient({
         </div>
       )}
 
-      {/* Tab Switcher */}
+      {/* Tab Switcher — 3 tabs */}
       <div className="flex gap-1 rounded-lg bg-muted p-1">
         <button
           onClick={() => setActiveTab('optimizer')}
@@ -298,15 +211,26 @@ export function RecommendationsClient({
           Compute Optimizer ({optimizerRecs.length})
         </button>
         <button
-          onClick={() => setActiveTab('patterns')}
+          onClick={() => setActiveTab('rightsizing')}
           className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'patterns'
+            activeTab === 'rightsizing'
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Lightbulb className="mr-2 inline h-4 w-4" />
-          Cost Patterns ({costRecs.length})
+          <Server className="mr-2 inline h-4 w-4" />
+          CE Rightsizing ({ceRightsizing.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('ri-sp')}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'ri-sp'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Zap className="mr-2 inline h-4 w-4" />
+          RI & SP ({riRecommendations.length + spRecommendations.length})
         </button>
       </div>
 
@@ -360,7 +284,15 @@ export function RecommendationsClient({
                       return (
                         <tr key={`${rec.resourceType}-${rec.resourceId}`} className="border-b last:border-0 hover:bg-muted/50">
                           <td className="px-6 py-3">
-                            <span className="font-mono text-xs">{rec.resourceId}</span>
+                            <a
+                              href={`https://console.aws.amazon.com/ec2/v2/home?region=${rec.region}#InstanceDetails:instanceId=${rec.resourceId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                            >
+                              {rec.resourceId}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           </td>
                           <td className="px-6 py-3">
                             <span className="inline-flex items-center gap-1.5">
@@ -400,51 +332,226 @@ export function RecommendationsClient({
         </>
       )}
 
-      {/* Cost Patterns Tab */}
-      {activeTab === 'patterns' && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {costRecs.map((rec) => {
-            const Icon = rec.icon;
-            return (
-              <div
-                key={rec.category}
-                className="group rounded-xl border bg-card p-6 shadow-sm transition-colors hover:border-primary/50"
-              >
-                <div className="flex items-start justify-between">
-                  <Icon className="h-5 w-5 text-warning" />
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${severityStyles[rec.severity]}`}>
-                    {rec.severity}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-semibold">{rec.category}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{rec.description}</p>
-                {rec.services.length > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Services: {rec.services.slice(0, 3).join(', ')}{rec.services.length > 3 ? ` +${rec.services.length - 3} more` : ''}
-                  </p>
-                )}
-                <div className="mt-4 flex items-center justify-between border-t pt-3">
-                  <span className="text-sm text-muted-foreground">{rec.count} resources</span>
-                  <span className="font-semibold text-green-600 dark:text-green-400">
-                    {format(rec.savings)}/mo
-                  </span>
-                </div>
+      {/* CE Rightsizing Tab */}
+      {activeTab === 'rightsizing' && (
+        <>
+          {ceRightsizing.length === 0 ? (
+            <div className="rounded-xl border bg-card p-8 text-center">
+              <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+              <p className="mt-4 font-semibold text-green-700 dark:text-green-300">No Rightsizing Recommendations</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                AWS Cost Explorer found no rightsizing opportunities at this time.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="p-6 pb-3">
+                <h3 className="font-semibold">Cost Explorer Rightsizing</h3>
+                <p className="text-sm text-muted-foreground">
+                  EC2 rightsizing recommendations from AWS Cost Explorer — {format(ceSavings)}/mo potential savings
+                </p>
               </div>
-            );
-          })}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-t text-left">
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Instance ID</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Current Type</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Action</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Target Type</th>
+                      <th className="px-6 py-3 text-right font-medium text-muted-foreground">Est. Savings</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ceRightsizing.map((rec) => {
+                      const isTerminate = rec.action.toUpperCase() === 'TERMINATE';
+                      return (
+                        <tr key={rec.instanceId} className="border-b last:border-0 hover:bg-muted/50">
+                          <td className="px-6 py-3">
+                            <a
+                              href={`https://console.aws.amazon.com/ec2/v2/home#InstanceDetails:instanceId=${rec.instanceId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                            >
+                              {rec.instanceId}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </td>
+                          <td className="px-6 py-3">
+                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{rec.instanceType}</code>
+                          </td>
+                          <td className="px-6 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                              isTerminate
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              {rec.action}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3">
+                            {isTerminate ? (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            ) : (
+                              <code className="rounded bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-xs text-green-700 dark:text-green-400">
+                                {rec.targetInstanceType}
+                              </code>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-right">
+                            <span className="font-semibold text-green-600 dark:text-green-400">
+                              {format(rec.estimatedMonthlySavings)}/mo
+                            </span>
+                          </td>
+                          <td className="px-6 py-3">
+                            <a
+                              href={`https://console.aws.amazon.com/ec2/v2/home#InstanceDetails:instanceId=${rec.instanceId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              View in AWS <ArrowRight className="h-3 w-3" />
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* RI & SP Tab */}
+      {activeTab === 'ri-sp' && (
+        <div className="space-y-6">
+          {/* Reserved Instance Recommendations */}
+          <div className="rounded-xl border bg-card shadow-sm">
+            <div className="p-6 pb-3">
+              <h3 className="font-semibold">Reserved Instance Recommendations</h3>
+              <p className="text-sm text-muted-foreground">
+                {riRecommendations.length > 0
+                  ? `${riRecommendations.length} RI purchase opportunities — ${format(riSavings)}/mo potential savings`
+                  : 'No RI purchase recommendations available'}
+              </p>
+            </div>
+            {riRecommendations.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-t text-left">
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Instance Type</th>
+                      <th className="px-6 py-3 text-right font-medium text-muted-foreground">Est. Monthly Savings</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {riRecommendations.map((rec, i) => (
+                      <tr key={`ri-${i}`} className="border-b last:border-0 hover:bg-muted/50">
+                        <td className="px-6 py-3">
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{rec.instanceType}</code>
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            {format(rec.estimatedMonthlySavings)}/mo
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <a
+                            href="https://console.aws.amazon.com/ec2/v2/home#ReservedInstances:"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            Purchase in AWS <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-6 pb-6">
+                <p className="text-sm text-muted-foreground">
+                  No Reserved Instance recommendations at this time. Your current RI coverage is optimal.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Savings Plans Recommendations */}
+          <div className="rounded-xl border bg-card shadow-sm">
+            <div className="p-6 pb-3">
+              <h3 className="font-semibold">Savings Plans Recommendations</h3>
+              <p className="text-sm text-muted-foreground">
+                {spRecommendations.length > 0
+                  ? `${spRecommendations.length} SP purchase opportunities — ${format(spSavings)}/mo potential savings`
+                  : 'No Savings Plans recommendations available'}
+              </p>
+            </div>
+            {spRecommendations.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-t text-left">
+                      <th className="px-6 py-3 font-medium text-muted-foreground">Savings Plan Type</th>
+                      <th className="px-6 py-3 text-right font-medium text-muted-foreground">Est. Monthly Savings</th>
+                      <th className="px-6 py-3 font-medium text-muted-foreground" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {spRecommendations.map((rec, i) => (
+                      <tr key={`sp-${i}`} className="border-b last:border-0 hover:bg-muted/50">
+                        <td className="px-6 py-3">
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{rec.savingsPlanType}</code>
+                        </td>
+                        <td className="px-6 py-3 text-right">
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            {format(rec.estimatedMonthlySavings)}/mo
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <a
+                            href="https://console.aws.amazon.com/savingsplans/home#/purchase"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            Purchase in AWS <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-6 pb-6">
+                <p className="text-sm text-muted-foreground">
+                  No Savings Plans recommendations at this time. Your current SP coverage is optimal.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Source Info */}
+      {/* Data Sources Info */}
       <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-        <Info className="mt-0.5 h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+        <Lightbulb className="mt-0.5 h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
         <div>
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-            Data sources
+            All recommendations are from real AWS data
           </p>
           <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-            <strong>Compute Optimizer</strong> — real utilization-based rightsizing from AWS (EC2, Lambda, EBS, Auto Scaling).{' '}
-            <strong>Cost Patterns</strong> — heuristic savings estimates derived from AWS Cost Explorer spending data.
+            <strong>Compute Optimizer</strong> — utilization-based rightsizing (EC2, Lambda, EBS, Auto Scaling).{' '}
+            <strong>CE Rightsizing</strong> — Cost Explorer recommendations with instance-level detail.{' '}
+            <strong>RI & SP</strong> — Reserved Instance and Savings Plans purchase recommendations from AWS.
           </p>
         </div>
       </div>

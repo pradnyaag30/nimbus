@@ -34,6 +34,7 @@ export default async function BudgetsPage() {
         topServices={data.topServices}
         accountId={data.accountId}
         error={data.error}
+        awsBudgets={data.awsBudgets}
       />
     </div>
   );

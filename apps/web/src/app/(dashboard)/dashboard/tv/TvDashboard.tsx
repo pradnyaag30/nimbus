@@ -74,19 +74,11 @@ export function TvDashboard({
       severity: s.change > 50 ? 'critical' as const : 'warning' as const,
     }));
 
-  // Derive savings estimates
-  const computeServices = topServices.filter((s) =>
-    /ec2|compute|instance|lambda|fargate|ecs/i.test(s.name),
-  );
-  const computeSavings = computeServices.reduce((s, c) => s + c.cost, 0) * 0.15;
-  const stableCost = topServices
-    .filter((s) => Math.abs(s.change) < 20 && s.cost > 1)
-    .reduce((s, c) => s + c.cost, 0);
-  const riSavings = stableCost * 0.30;
-  const totalSavings = computeSavings + riSavings;
+  // Savings data — uses count of anomalies as proxy (real savings from recommendations page)
+  const totalSavings = anomalies.reduce((s, a) => s + a.impact, 0);
 
-  // Budget & forecast
-  const budgetLimit = forecastedSpend * 1.1;
+  // Budget & forecast — use forecast as the budget target (no fake 1.1x)
+  const budgetLimit = forecastedSpend;
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const dailyBurn = totalSpendMTD / Math.max(new Date().getDate(), 1);
   const projectedEOM = dailyBurn * daysInMonth;
@@ -113,7 +105,7 @@ export function TvDashboard({
             <Cloud className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Nimbus NOC</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Executive Dashboard</h1>
             <p className="text-sm text-muted-foreground">
               Cloud FinOps Command Center — AWS Account {accountId}
             </p>
@@ -126,10 +118,10 @@ export function TvDashboard({
           </div>
           <div>
             <p className="text-2xl font-bold tabular-nums">
-              {time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
             <p className="text-xs text-muted-foreground">
-              {time.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+              {time.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
           </div>
         </div>
@@ -146,7 +138,7 @@ export function TvDashboard({
       <div className="mb-6 grid grid-cols-4 gap-4">
         <KpiCard title="Total Spend (MTD)" value={format(totalSpendMTD)} change={changePercentage} icon={DollarSign} color="text-primary" />
         <KpiCard title="Forecasted Spend" value={format(forecastedSpend)} subtitle="(EOM)" icon={TrendingUp} color="text-orange-500" />
-        <KpiCard title="Savings Available" value={format(totalSavings)} subtitle="/month" icon={TrendingDown} color="text-green-500" />
+        <KpiCard title="Anomaly Impact" value={format(totalSavings)} subtitle="/month" icon={TrendingDown} color="text-green-500" />
         <KpiCard title="Active Anomalies" value={String(anomalies.length)} icon={AlertTriangle} color={anomalies.length > 0 ? 'text-red-500' : 'text-green-500'} alert={anomalies.length > 0} />
       </div>
 
@@ -329,7 +321,7 @@ export function TvDashboard({
             <span className={`h-1.5 w-1.5 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'}`} />
             {error ? 'Connection issue' : 'All systems operational'}
           </span>
-          <span>Last sync: {time.toLocaleTimeString('en-IN')}</span>
+          <span>Last sync: {time.toLocaleTimeString('en-US')}</span>
           <span>1 cloud account connected</span>
         </div>
       </div>

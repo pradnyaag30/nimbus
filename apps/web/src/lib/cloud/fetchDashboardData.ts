@@ -54,6 +54,8 @@ let cachedAt = 0;
 const defaultCommitment: CommitmentCoverage = {
   savingsPlansCoveragePercent: 0,
   savingsPlansUtilizationPercent: 0,
+  reservedInstanceCoveragePercent: 0,
+  reservedInstanceUtilizationPercent: 0,
   totalOnDemandCost: 0,
   totalCommittedCost: 0,
   estimatedSavingsFromCommitments: 0,

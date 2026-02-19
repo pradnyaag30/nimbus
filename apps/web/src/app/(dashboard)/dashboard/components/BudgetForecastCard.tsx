@@ -49,13 +49,13 @@ export function BudgetForecastCard({
 }: BudgetForecastCardProps) {
   const { format } = useCurrency();
 
-  // Use real AWS Budgets when available, otherwise fall back to prev month + 10%
-  const budget =
-    awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0
-      ? awsBudgets.totalBudgetLimit
-      : previousMonthTotal > 0
-        ? previousMonthTotal * 1.1
-        : 0;
+  // Use real AWS Budgets when available, otherwise use AWS Cost Forecast
+  const hasRealBudget = awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0;
+  const budget = hasRealBudget
+    ? awsBudgets.totalBudgetLimit
+    : forecastedSpend > 0
+      ? forecastedSpend
+      : 0;
   const variance = forecastedSpend - budget;
   const usagePct = budget > 0 ? (totalSpendMTD / budget) * 100 : 0;
   const forecastRatio = budget > 0 ? (forecastedSpend / budget) * 100 : 0;
@@ -88,7 +88,7 @@ export function BudgetForecastCard({
         <div>
           <h3 className="font-semibold">Budget vs Forecast</h3>
           <p className="text-sm text-muted-foreground">
-            Are we within budget this month?
+            {hasRealBudget ? 'Tracking against AWS Budget' : 'Based on AWS Cost Forecast'}
           </p>
         </div>
         <span

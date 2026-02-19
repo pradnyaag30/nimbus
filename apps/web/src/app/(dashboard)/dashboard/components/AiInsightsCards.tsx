@@ -7,8 +7,10 @@ import {
   CreditCard,
   AlertTriangle,
   Sparkles,
+  ArrowRight,
   type LucideIcon,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useCurrency } from '@/components/providers/CurrencyProvider';
 
 // --- Types -------------------------------------------------------------------
@@ -27,31 +29,35 @@ interface AiInsight {
 
 const categoryConfig: Record<
   AiInsight['category'],
-  { icon: LucideIcon; colors: string; iconBg: string; label: string }
+  { icon: LucideIcon; colors: string; iconBg: string; label: string; href: string }
 > = {
   'idle-resources': {
     icon: Server,
     colors: 'text-orange-600 dark:text-orange-400',
     iconBg: 'bg-orange-50 dark:bg-orange-900/20',
     label: 'Idle Resources',
+    href: '/dashboard/recommendations',
   },
   'cost-spike': {
     icon: TrendingUp,
     colors: 'text-red-600 dark:text-red-400',
     iconBg: 'bg-red-50 dark:bg-red-900/20',
     label: 'Cost Spike',
+    href: '/dashboard/anomalies',
   },
   'unused-commitments': {
     icon: CreditCard,
     colors: 'text-purple-600 dark:text-purple-400',
     iconBg: 'bg-purple-50 dark:bg-purple-900/20',
     label: 'Commitments',
+    href: '/dashboard/recommendations',
   },
   anomaly: {
     icon: AlertTriangle,
     colors: 'text-yellow-600 dark:text-yellow-400',
     iconBg: 'bg-yellow-50 dark:bg-yellow-900/20',
     label: 'Anomaly',
+    href: '/dashboard/anomalies',
   },
 };
 
@@ -92,7 +98,10 @@ function InsightCard({ insight }: { insight: AiInsight }) {
   const Icon = config.icon;
 
   return (
-    <div className="rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md">
+    <Link
+      href={config.href}
+      className="block rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/50 cursor-pointer"
+    >
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className={`rounded-lg p-2 ${config.iconBg}`}>
@@ -130,7 +139,12 @@ function InsightCard({ insight }: { insight: AiInsight }) {
           {insight.severity}
         </span>
       </div>
-    </div>
+
+      {/* View Details link */}
+      <div className="mt-2 flex items-center justify-end gap-1 text-xs font-medium text-primary">
+        View Details <ArrowRight className="h-3 w-3" />
+      </div>
+    </Link>
   );
 }
 

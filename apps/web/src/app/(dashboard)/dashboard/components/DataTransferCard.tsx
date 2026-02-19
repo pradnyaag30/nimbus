@@ -39,7 +39,8 @@ export function DataTransferCard({ dataTransfer, totalSpendMTD }: DataTransferCa
         <div>
           <h3 className="font-semibold">Data Transfer Visibility</h3>
           <p className="text-sm text-muted-foreground">
-            Network egress costs — {transferPercent.toFixed(1)}% of total spend
+            Network egress costs — {format(totalTransferCost)} MTD
+            {transferPercent >= 0.1 && ` (${transferPercent.toFixed(1)}% of spend)`}
           </p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
