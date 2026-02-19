@@ -17,6 +17,7 @@ import { RealBudgetsCard } from './components/RealBudgetsCard';
 import { TagComplianceCard } from './components/TagComplianceCard';
 import { SavingsOpportunitiesCard } from './components/SavingsOpportunitiesCard';
 import { NativeAnomaliesCard } from './components/NativeAnomaliesCard';
+import { AiInsightsCards } from './components/AiInsightsCards';
 import { AlertTriangle } from 'lucide-react';
 
 export const metadata = { title: 'Dashboard' };
@@ -50,6 +51,9 @@ export default async function DashboardPage() {
         changePercentage={data.changePercentage}
         previousMonthTotal={data.previousMonthTotal}
       />
+
+      {/* AI-Powered Insights */}
+      <AiInsightsCards />
 
       {/* Budget vs Forecast + Burn Rate */}
       <div className="grid gap-6 sm:grid-cols-2">

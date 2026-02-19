@@ -185,10 +185,55 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
     return `**Provider Comparison:**\n\n| Provider | Spend | Change | % of Total |\n|----------|-------|--------|------------|\n${data.providers.map((p) => `| ${p.name} | ${fmt(p.spend)} | ${pct(p.change)} | ${((p.spend / data.totalSpendMTD) * 100).toFixed(1)}% |`).join('\n')}\n\n**Verdict:** AWS is the largest spend at ${fmt(data.providers[0].spend)}. Azure is growing fastest at ${pct(data.providers.find((p) => p.name === 'Azure')?.change || 0)}.`;
   }
 
-  // --- RESERVED / RI ---
-  if (has(tokens, 'reserved', 'ri', 'commit', 'saving plan', 'commitment')) {
+  // --- COMMITMENT / COVERAGE / UTILIZATION ---
+  if (has(tokens, 'commit', 'coverage', 'utiliz', 'saving plan', 'sp ')) {
+    const c = data.commitment;
+    if (c) {
+      return `**Commitment Coverage & Utilization:**\n\n- **SP Coverage:** ${c.savingsPlansCoveragePercent.toFixed(1)}%\n- **SP Utilization:** ${c.savingsPlansUtilizationPercent.toFixed(1)}%\n- **On-Demand Cost:** ${fmt(c.totalOnDemandCost)}\n- **Committed Cost:** ${fmt(c.totalCommittedCost)}\n- **Estimated Savings:** ${fmt(c.estimatedSavingsFromCommitments)}\n\n${c.savingsPlansUtilizationPercent < 80 ? `⚠️ Utilization is below 80% — ${(100 - c.savingsPlansUtilizationPercent).toFixed(0)}% of committed spend may be wasted.` : `✅ Strong utilization at ${c.savingsPlansUtilizationPercent.toFixed(0)}%.`}`;
+    }
     const ri = data.recommendations.find((r) => r.category === 'Reserved Instances');
     return `**Reserved Instance Opportunities:**\n\n- **Available RI savings:** ${fmt(ri?.savings || 0)}/month (${fmt((ri?.savings || 0) * 12)}/year)\n- **Resources eligible:** ${ri?.count || 0} instances\n\nConverting on-demand workloads with stable usage patterns to 1-year or 3-year reserved instances offers the single largest cost optimization.`;
+  }
+
+  // --- RESERVED / RI ---
+  if (has(tokens, 'reserved', 'ri')) {
+    const ri = data.recommendations.find((r) => r.category === 'Reserved Instances');
+    const riReal = data.riRecommendations;
+    if (riReal && riReal.length > 0) {
+      const totalSavings = riReal.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+      return `**Reserved Instance Recommendations:**\n\n**${riReal.length} RI purchase opportunities** — ${fmt(totalSavings)}/month (${fmt(totalSavings * 12)}/year)\n\n${riReal.slice(0, 5).map((r) => `- **${r.instanceType}:** save ${fmt(r.estimatedMonthlySavings)}/mo`).join('\n')}\n\n${riReal.length > 5 ? `+${riReal.length - 5} more recommendations\n\n` : ''}💡 These are 1-year No Upfront RI recommendations for stable EC2 workloads.`;
+    }
+    return `**Reserved Instance Opportunities:**\n\n- **Available RI savings:** ${fmt(ri?.savings || 0)}/month\n- **Resources eligible:** ${ri?.count || 0} instances\n\nNo specific RI purchase recommendations available at this time.`;
+  }
+
+  // --- DATA TRANSFER / EGRESS ---
+  if (has(tokens, 'transfer', 'egress', 'ingress', 'bandwidth')) {
+    const dt = data.dataTransfer;
+    if (dt && dt.length > 0) {
+      const total = dt.reduce((s, d) => s + d.cost, 0);
+      const spiking = dt.filter((d) => d.change > 20);
+      return `**Data Transfer Costs (MTD):**\n\n${dt.map((d) => `- **${d.category}:** ${fmt(d.cost)} (${pct(d.change)} MoM)`).join('\n')}\n\n**Total Data Transfer:** ${fmt(total)}\n\n${spiking.length > 0 ? `⚠️ **${spiking.length} categories spiking:** ${spiking.map((d) => `${d.category} (${pct(d.change)})`).join(', ')}` : '✅ All data transfer categories stable.'}`;
+    }
+    return `**Data Transfer:** No data transfer cost breakdown available. This typically means minimal egress charges.`;
+  }
+
+  // --- TAG COMPLIANCE / TAGGING ---
+  if (has(tokens, 'tag', 'compliance', 'tagging', 'untagged')) {
+    const tc = data.tagCompliance;
+    if (tc && tc.status === 'active') {
+      return `**Tag Compliance:**\n\n- **Total Resources:** ${tc.totalResources}\n- **Tagged:** ${tc.taggedResources} (${tc.compliancePercent.toFixed(1)}%)\n- **Untagged:** ${tc.untaggedResources}\n\n${tc.compliancePercent < 80 ? `⚠️ Tag compliance is below 80%. ${tc.untaggedResources} resources lack required tags, making cost allocation difficult.` : `✅ Tag compliance is strong at ${tc.compliancePercent.toFixed(1)}%.`}`;
+    }
+    return `**Tag Compliance:** Data not available. Ensure tag compliance monitoring is enabled.`;
+  }
+
+  // --- TRUSTED ADVISOR ---
+  if (has(tokens, 'trusted', 'advisor')) {
+    const ta = data.trustedAdvisor;
+    if (ta && ta.status === 'active') {
+      const co = ta.byCategoryScore.cost_optimizing;
+      return `**Trusted Advisor Summary:**\n\n- **Total Estimated Savings:** ${fmt(ta.totalEstimatedSavings)}\n\n**By Category:**\n- Cost Optimization: ${co.error} errors, ${co.warning} warnings — ${fmt(co.estimatedSavings)} savings\n- Security: ${ta.byCategoryScore.security.error} errors, ${ta.byCategoryScore.security.warning} warnings\n- Fault Tolerance: ${ta.byCategoryScore.fault_tolerance.error} errors, ${ta.byCategoryScore.fault_tolerance.warning} warnings\n- Performance: ${ta.byCategoryScore.performance.error} errors, ${ta.byCategoryScore.performance.warning} warnings\n- Service Limits: ${ta.byCategoryScore.service_limits.error} errors, ${ta.byCategoryScore.service_limits.warning} warnings\n\n${co.error > 0 ? `⚠️ **${co.error} cost optimization errors** need immediate attention.` : '✅ No critical cost optimization issues.'}`;
+    }
+    return `**Trusted Advisor:** ${ta?.status === 'not-entitled' ? 'Requires AWS Business or Enterprise Support plan.' : 'Data not available.'}`;
   }
 
   // --- COST PER / UNIT ECONOMICS ---
@@ -200,14 +245,26 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
 
   // --- IDLE / UNUSED ---
   if (has(tokens, 'idle', 'unused', 'zombie', 'orphan', 'unattach', 'delete')) {
+    const ce = data.ceRightsizing;
+    if (ce && ce.length > 0) {
+      const terminateRecs = ce.filter((r) => r.action.toUpperCase() === 'TERMINATE');
+      const terminateSavings = terminateRecs.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+      return `**Idle / Unused Resources (CE Rightsizing):**\n\n- **Instances to terminate:** ${terminateRecs.length}\n- **Monthly savings:** ${fmt(terminateSavings)}\n\n${terminateRecs.slice(0, 5).map((r) => `- **${r.instanceId}** (${r.instanceType}): save ${fmt(r.estimatedMonthlySavings)}/mo`).join('\n')}\n\n${terminateRecs.length > 5 ? `+${terminateRecs.length - 5} more idle instances\n\n` : ''}These instances show consistently low utilization and are recommended for termination.`;
+    }
     const idle = data.recommendations.find((r) => r.category === 'Idle Resources');
-    return `**Idle / Unused Resources:**\n\n- **Idle resources found:** ${idle?.count || 0}\n- **Potential savings:** ${fmt(idle?.savings || 0)}/month\n\nThese include unattached disks, stopped instances still incurring charges, unused elastic IPs, and orphaned snapshots. Cleaning these up is a quick win with zero performance impact.`;
+    return `**Idle / Unused Resources:**\n\n- **Idle resources found:** ${idle?.count || 0}\n- **Potential savings:** ${fmt(idle?.savings || 0)}/month\n\nThese include unattached disks, stopped instances still incurring charges, unused elastic IPs, and orphaned snapshots.`;
   }
 
   // --- RIGHTSIZE ---
   if (has(tokens, 'rightsize', 'right-size', 'resize', 'downsize', 'overprovision')) {
-    const rs = data.recommendations.find((r) => r.category === 'Rightsizing');
-    return `**Rightsizing Opportunities:**\n\n- **Resources to rightsize:** ${rs?.count || 0}\n- **Monthly savings:** ${fmt(rs?.savings || 0)}\n- **Annual savings:** ${fmt((rs?.savings || 0) * 12)}\n\nThese instances are consistently using less than 40% of provisioned CPU/memory. Downsizing to the next tier maintains performance while reducing cost.`;
+    const ce = data.ceRightsizing;
+    if (ce && ce.length > 0) {
+      const modifyRecs = ce.filter((r) => r.action.toUpperCase() !== 'TERMINATE');
+      const modifySavings = modifyRecs.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+      return `**Rightsizing Recommendations (CE):**\n\n- **Instances to rightsize:** ${modifyRecs.length}\n- **Monthly savings:** ${fmt(modifySavings)} (${fmt(modifySavings * 12)}/year)\n\n${modifyRecs.slice(0, 5).map((r) => `- **${r.instanceId}** (${r.instanceType} → ${r.targetInstanceType}): save ${fmt(r.estimatedMonthlySavings)}/mo`).join('\n')}\n\n${modifyRecs.length > 5 ? `+${modifyRecs.length - 5} more rightsizing opportunities\n\n` : ''}💡 These instances are over-provisioned. Downsizing maintains performance while reducing cost.`;
+    }
+    const rs = data.recommendations.find((r) => r.category === 'Rightsizing' || r.category === 'CE Rightsizing');
+    return `**Rightsizing Opportunities:**\n\n- **Resources to rightsize:** ${rs?.count || 0}\n- **Monthly savings:** ${fmt(rs?.savings || 0)}\n- **Annual savings:** ${fmt((rs?.savings || 0) * 12)}\n\nThese instances are consistently using less than 40% of provisioned CPU/memory.`;
   }
 
   // --- SMART FALLBACK: Try to match any keyword to a service/provider/concept ---

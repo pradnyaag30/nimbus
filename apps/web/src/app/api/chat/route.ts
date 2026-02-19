@@ -18,42 +18,56 @@ const requestSchema = z.object({
     .optional(),
 });
 
-/** Build a CostSummary from live AWS dashboard data */
+/** Build a CostSummary from live AWS dashboard data — uses real Phase 2-3 data */
 async function buildLiveCostSummary(): Promise<CostSummary> {
   const data = await getDashboardData();
 
   const services = data.topServices;
   const totalMTD = data.totalSpendMTD;
 
-  // Derive recommendations from real cost patterns
-  const computeServices = services.filter((s) => /ec2|compute|instance|lambda|fargate|ecs/i.test(s.name));
-  const storageServices = services.filter((s) => /s3|storage|ebs|efs|glacier|backup|snapshot/i.test(s.name));
-  const stableServices = services.filter((s) => Math.abs(s.change) < 20 && s.cost > 1);
-  const tinyServices = services.filter((s) => s.cost > 0 && s.cost < totalMTD * 0.01);
+  // Use REAL CE rightsizing + RI + SP + optimizer for recommendations
+  const ceRightsizingSavings = data.ceRightsizing.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+  const riSavings = data.riRecommendations.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+  const spSavings = data.spRecommendations.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
 
   const recommendations = [
-    { category: 'Rightsizing', count: computeServices.length, savings: computeServices.reduce((s, c) => s + c.cost, 0) * 0.15 },
-    { category: 'Savings Plans', count: stableServices.length, savings: stableServices.reduce((s, c) => s + c.cost, 0) * 0.30 },
-    { category: 'Storage Optimization', count: storageServices.length, savings: storageServices.reduce((s, c) => s + c.cost, 0) * 0.20 },
-    { category: 'Idle Resources', count: tinyServices.length, savings: tinyServices.reduce((s, c) => s + c.cost, 0) * 0.50 },
-  ].filter((r) => r.count > 0);
+    { category: 'CE Rightsizing', count: data.ceRightsizing.length, savings: ceRightsizingSavings },
+    { category: 'Reserved Instances', count: data.riRecommendations.length, savings: riSavings },
+    { category: 'Savings Plans', count: data.spRecommendations.length, savings: spSavings },
+    { category: 'Compute Optimizer', count: data.optimizerByType.reduce((s, t) => s + t.count, 0), savings: data.optimizerSavings },
+    { category: 'Trusted Advisor', count: data.trustedAdvisor?.checks.filter((c) => c.status !== 'ok').length ?? 0, savings: data.trustedAdvisor?.totalEstimatedSavings ?? 0 },
+  ].filter((r) => r.count > 0 || r.savings > 0);
 
-  // Derive anomalies from services with >20% MoM increase
-  const anomalies = services
-    .filter((s) => s.change > 20)
+  // Use REAL native anomalies + service spikes
+  const nativeAnoms = (data.nativeAnomalies?.anomalies ?? []).map((a) => ({
+    title: `${a.rootCauses[0]?.service || a.dimensionValue} anomaly`,
+    provider: 'AWS',
+    service: a.rootCauses[0]?.service || a.dimensionValue,
+    impact: a.impact.totalImpact,
+    status: 'open',
+  }));
+  const serviceSpikes = services
+    .filter((s) => s.change > 30)
     .map((s) => ({
-      title: `${s.name} cost spike (${s.change.toFixed(0)}% MoM increase)`,
+      title: `${s.name} cost spike (${s.change.toFixed(0)}% MoM)`,
       provider: s.provider,
       service: s.name,
       impact: s.cost * (s.change / 100),
       status: 'open',
     }));
+  const anomalies = [...nativeAnoms, ...serviceSpikes];
 
-  // Derive budget (110% of forecast)
-  const budgetLimit = data.forecastedSpend * 1.1;
-  const budgets = [
-    { name: 'AWS Monthly Budget', limit: budgetLimit, spent: totalMTD, provider: 'AWS' },
-  ];
+  // Use REAL AWS Budgets
+  const budgets = (data.awsBudgets?.budgets ?? []).map((b) => ({
+    name: b.budgetName,
+    limit: b.limitAmount,
+    spent: b.currentSpend,
+    provider: 'AWS',
+  }));
+  // Fallback if no real budgets
+  if (budgets.length === 0 && data.forecastedSpend > 0) {
+    budgets.push({ name: 'AWS Monthly (estimated)', limit: data.forecastedSpend * 1.1, spent: totalMTD, provider: 'AWS' });
+  }
 
   const totalSavings = recommendations.reduce((s, r) => s + r.savings, 0);
 
@@ -61,7 +75,7 @@ async function buildLiveCostSummary(): Promise<CostSummary> {
     totalSpendMTD: totalMTD,
     forecastedSpend: data.forecastedSpend,
     savingsIdentified: totalSavings,
-    activeAnomalies: anomalies.length,
+    activeAnomalies: data.nativeAnomalies?.activeAnomalies ?? anomalies.length,
     providers: [
       { name: 'AWS', spend: totalMTD, change: data.changePercentage },
     ],
@@ -69,6 +83,20 @@ async function buildLiveCostSummary(): Promise<CostSummary> {
     budgets,
     recommendations,
     anomalies,
+    // Pass through all Phase 2-3 data for expanded prompt
+    previousMonthTotal: data.previousMonthTotal,
+    changePercentage: data.changePercentage,
+    ceRightsizing: data.ceRightsizing,
+    riRecommendations: data.riRecommendations,
+    spRecommendations: data.spRecommendations,
+    commitment: data.commitment,
+    dataTransfer: data.dataTransfer,
+    trustedAdvisor: data.trustedAdvisor,
+    awsBudgets: data.awsBudgets,
+    tagCompliance: data.tagCompliance,
+    nativeAnomalies: data.nativeAnomalies,
+    optimizerSavings: data.optimizerSavings,
+    optimizerByType: data.optimizerByType,
   };
 }
 
@@ -115,7 +143,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-5-20250929',
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: systemPrompt,
           messages,
         }),

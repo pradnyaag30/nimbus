@@ -17,12 +17,12 @@ interface ChatPanelProps {
 }
 
 const SUGGESTIONS = [
-  'Give me a summary',
-  'Top spending services',
-  'Show anomalies',
-  'How can we save?',
-  'Budget status',
-  'AWS spend breakdown',
+  'What are my top savings opportunities?',
+  'Are any EC2 instances idle or underutilized?',
+  'Show me cost anomalies this month',
+  'How much can I save with Reserved Instances?',
+  'What is my Savings Plans utilization?',
+  'Which services spiked the most?',
 ];
 
 export function ChatPanel({ open, onClose }: ChatPanelProps) {
