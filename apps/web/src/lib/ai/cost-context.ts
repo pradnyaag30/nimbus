@@ -26,6 +26,16 @@ export interface CostSummary {
   nativeAnomalies?: { anomalies: { anomalyId: string; dimensionValue: string; rootCauses: { service: string; region: string; usageType: string }[]; impact: { totalImpact: number; maxImpact: number; totalActualSpend: number; totalExpectedSpend: number } }[]; totalImpact: number; activeAnomalies: number; status: string } | null;
   optimizerSavings?: number;
   optimizerByType?: { type: string; count: number; savings: number }[];
+
+  // CUR (Cost and Usage Reports) — resource-level data via Athena
+  curAvailable?: boolean;
+  curData?: {
+    topResources?: { resource_id: string; service_name: string; resource_type: string; region: string; total_cost: string }[];
+    hourlyCosts?: { hour: string; service_name: string; hourly_cost: string; resource_count: string }[];
+    tagAllocation?: { tag_value: string; service_name: string; total_cost: string; resource_count: string }[];
+    untaggedCosts?: { resource_id: string; service_name: string; total_cost: string; missing_tag: string }[];
+    resourceDetail?: { usage_date: string; service_name: string; charge_type: string; daily_cost: string }[];
+  };
 }
 
 export function buildCostContextPrompt(data: CostSummary): string {
@@ -95,6 +105,33 @@ ${na.anomalies.slice(0, 5).map((a) => `- ${a.rootCauses[0]?.service || a.dimensi
 ${data.optimizerByType?.map((t) => `- ${t.type}: ${t.count} resources, $${t.savings.toFixed(0)}/mo savings`).join('\n') || ''}\n`;
   }
 
+  // CUR (resource-level) data sections
+  if (data.curAvailable && data.curData) {
+    extendedSections += '\nCUR DATA AVAILABLE: Yes (resource-level, hourly granularity via Athena)\n';
+
+    if (data.curData.topResources && data.curData.topResources.length > 0) {
+      extendedSections += `\nTOP RESOURCES BY COST (CUR):\n${data.curData.topResources.slice(0, 15).map((r) => `- ${r.resource_id || 'N/A'} (${r.service_name}/${r.resource_type || 'N/A'}) in ${r.region || 'N/A'}: $${parseFloat(r.total_cost).toFixed(2)}`).join('\n')}\n`;
+    }
+
+    if (data.curData.hourlyCosts && data.curData.hourlyCosts.length > 0) {
+      extendedSections += `\nHOURLY COST BREAKDOWN (CUR):\n${data.curData.hourlyCosts.slice(0, 20).map((h) => `- ${h.hour} | ${h.service_name}: $${parseFloat(h.hourly_cost).toFixed(2)} (${h.resource_count} resources)`).join('\n')}\n`;
+    }
+
+    if (data.curData.tagAllocation && data.curData.tagAllocation.length > 0) {
+      extendedSections += `\nCOST BY TAG (CUR):\n${data.curData.tagAllocation.slice(0, 15).map((t) => `- ${t.tag_value}: $${parseFloat(t.total_cost).toFixed(2)} across ${t.resource_count} resources (${t.service_name})`).join('\n')}\n`;
+    }
+
+    if (data.curData.untaggedCosts && data.curData.untaggedCosts.length > 0) {
+      extendedSections += `\nUNTAGGED RESOURCE COSTS (CUR):\n${data.curData.untaggedCosts.slice(0, 10).map((u) => `- ${u.resource_id} (${u.service_name}): $${parseFloat(u.total_cost).toFixed(2)} — ${u.missing_tag}`).join('\n')}\n`;
+    }
+
+    if (data.curData.resourceDetail && data.curData.resourceDetail.length > 0) {
+      extendedSections += `\nRESOURCE COST DETAIL (CUR):\n${data.curData.resourceDetail.slice(0, 15).map((d) => `- ${d.usage_date}: ${d.service_name} (${d.charge_type}): $${parseFloat(d.daily_cost).toFixed(2)}`).join('\n')}\n`;
+    }
+  } else if (data.curAvailable === false) {
+    extendedSections += '\nCUR DATA: Not available. Resource-level drill-down requires CUR + Athena setup.\n';
+  }
+
   return `You are Nimbus AI, an expert Cloud FinOps assistant for a BFSI enterprise. You help teams understand their cloud spending, identify optimization opportunities, and answer billing questions.
 
 CURRENT COST DATA (Month-to-Date):
@@ -129,5 +166,8 @@ INSTRUCTIONS:
 - Highlight specific resource IDs and instance types when available
 - Provide actionable recommendations with estimated dollar impact
 - If data is not available for a topic, say so clearly
-- Keep responses focused and NOC-room friendly (brief, actionable)`;
+- Keep responses focused and NOC-room friendly (brief, actionable)
+- When CUR data is available: use resource-level data for specific resource IDs, hourly cost breakdowns, tag-based cost allocation, and untagged resource costs. CUR provides the deepest level of cost granularity.
+- When asked "why did costs spike on [date]?": use hourly CUR data to pinpoint the exact time and resources responsible
+- When asked about team/project/department costs: use CUR tag-based allocation data`;
 }

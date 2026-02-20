@@ -225,6 +225,53 @@ cat > /tmp/nimbus-policy.json << 'POLICY'
         "budgets:DescribeBudgets"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "AthenaCURQuery",
+      "Effect": "Allow",
+      "Action": [
+        "athena:StartQueryExecution",
+        "athena:GetQueryExecution",
+        "athena:GetQueryResults",
+        "athena:StopQueryExecution",
+        "athena:GetWorkGroup",
+        "athena:ListWorkGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GlueCatalogRead",
+      "Effect": "Allow",
+      "Action": [
+        "glue:GetDatabase",
+        "glue:GetDatabases",
+        "glue:GetTable",
+        "glue:GetTables",
+        "glue:GetPartitions",
+        "glue:GetPartition",
+        "glue:BatchGetPartition"
+      ],
+      "Resource": [
+        "arn:aws:glue:*:*:catalog",
+        "arn:aws:glue:*:*:database/athenacurcfn*",
+        "arn:aws:glue:*:*:database/nimbus*",
+        "arn:aws:glue:*:*:table/athenacurcfn*/*",
+        "arn:aws:glue:*:*:table/nimbus*/*"
+      ]
+    },
+    {
+      "Sid": "AthenaResultsBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::nimbus-athena-results-766940073591",
+        "arn:aws:s3:::nimbus-athena-results-766940073591/*"
+      ]
     }
   ]
 }
@@ -358,9 +405,43 @@ aws cur put-report-definition \
   }
 }
 
-# --- Step 6: Enable Compute Optimizer (for recommendations) -------------------
+# --- Step 6: Create Athena Workgroup for CUR Queries -------------------------
 echo ""
-echo "[6/6] Enabling AWS Compute Optimizer..."
+echo "[6/7] Creating Athena workgroup 'nimbus-finops'..."
+
+# Create S3 bucket for Athena query results
+ATHENA_RESULTS_BUCKET="nimbus-athena-results-${AWS_ACCOUNT_ID}"
+aws s3api create-bucket \
+  --bucket "${ATHENA_RESULTS_BUCKET}" \
+  --region "${AWS_REGION}" \
+  --create-bucket-configuration LocationConstraint="${AWS_REGION}" \
+  2>/dev/null || echo "  ↳ Athena results bucket already exists."
+
+# Create Athena workgroup with cost control (100MB scan limit per query)
+aws athena create-work-group \
+  --name "nimbus-finops" \
+  --region "${AWS_REGION}" \
+  --configuration '{
+    "ResultConfiguration": {
+      "OutputLocation": "s3://'"${ATHENA_RESULTS_BUCKET}"'/query-results/"
+    },
+    "EnforceWorkGroupConfiguration": true,
+    "BytesScannedCutoffPerQuery": 104857600,
+    "PublishCloudWatchMetricsEnabled": true,
+    "EngineVersion": {
+      "SelectedEngineVersion": "Athena engine version 3"
+    }
+  }' \
+  --description "Nimbus FinOps — CUR query workgroup with 100MB scan limit" \
+  2>/dev/null && echo "  ✅ Athena workgroup 'nimbus-finops' created." || \
+  echo "  ↳ Athena workgroup may already exist."
+
+echo "  ✅ Athena results bucket: ${ATHENA_RESULTS_BUCKET}"
+echo ""
+
+# --- Step 7: Enable Compute Optimizer (for recommendations) -------------------
+echo ""
+echo "[7/7] Enabling AWS Compute Optimizer..."
 
 aws compute-optimizer update-enrollment-status \
   --status Active \
@@ -376,11 +457,13 @@ echo "============================================="
 echo ""
 echo "  Resources Created:"
 echo "  ─────────────────────────────────────────"
-echo "  S3 Bucket:      ${CUR_BUCKET_NAME}"
-echo "  IAM Policy:     ${IAM_POLICY_NAME}"
-echo "  IAM User:       ${IAM_USER_NAME}"
-echo "  CUR Report:     ${CUR_REPORT_NAME}"
-echo "  Account ID:     ${AWS_ACCOUNT_ID}"
+echo "  S3 Bucket (CUR):     ${CUR_BUCKET_NAME}"
+echo "  S3 Bucket (Athena):  nimbus-athena-results-${AWS_ACCOUNT_ID}"
+echo "  IAM Policy:          ${IAM_POLICY_NAME}"
+echo "  IAM User:            ${IAM_USER_NAME}"
+echo "  CUR Report:          ${CUR_REPORT_NAME}"
+echo "  Athena Workgroup:    nimbus-finops"
+echo "  Account ID:          ${AWS_ACCOUNT_ID}"
 echo ""
 echo "  ⚠️  IMPORTANT NOTES:"
 echo "  ─────────────────────────────────────────"

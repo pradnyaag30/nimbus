@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
+    "@aws-sdk/client-athena": "^3.994.0",
     "@aws-sdk/client-budgets": "^3.986.0",
     "@aws-sdk/client-compute-optimizer": "^3.986.0",
     "@aws-sdk/client-config-service": "^3.986.0",

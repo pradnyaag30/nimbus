@@ -204,7 +204,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
       <div className="flex items-center gap-2 border-t bg-blue-50 px-3 py-1.5 dark:bg-blue-900/20">
         <Info className="h-3 w-3 shrink-0 text-blue-500" />
         <p className="text-[10px] text-blue-700 dark:text-blue-300">
-          Powered by AWS Cost Explorer APIs — deep CUR analysis coming soon
+          Powered by AWS Cost Explorer + CUR/Athena — ask about specific resources, hourly costs, or tag-based allocation
         </p>
       </div>
 
