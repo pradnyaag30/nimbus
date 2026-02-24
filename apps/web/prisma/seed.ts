@@ -17,15 +17,15 @@ async function main() {
     },
   });
 
-  // Create admin user (password: nimbus2024)
+  // Create admin user (password: finops2024)
   // In production, use bcrypt hashed passwords
   await prisma.user.upsert({
-    where: { email_tenantId: { email: 'admin@nimbus.dev', tenantId: tenant.id } },
+    where: { email_tenantId: { email: 'admin@finops.ai', tenantId: tenant.id } },
     update: {},
     create: {
-      email: 'admin@nimbus.dev',
+      email: 'admin@finops.ai',
       name: 'Admin User',
-      role: UserRole.ADMIN,
+      role: UserRole.FINOPS_ADMIN,
       tenantId: tenant.id,
     },
   });
