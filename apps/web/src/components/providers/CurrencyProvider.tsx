@@ -46,7 +46,7 @@ export function CurrencyProvider({
   const [currency, setCurrencyState] = useState<Currency>('INR');
 
   useEffect(() => {
-    const saved = localStorage.getItem('nimbus-currency') as Currency | null;
+    const saved = localStorage.getItem('finops-ai-currency') as Currency | null;
     if (saved && (saved === 'INR' || saved === 'USD')) {
       setCurrencyState(saved);
     }
@@ -54,7 +54,7 @@ export function CurrencyProvider({
 
   const setCurrency = useCallback((c: Currency) => {
     setCurrencyState(c);
-    localStorage.setItem('nimbus-currency', c);
+    localStorage.setItem('finops-ai-currency', c);
   }, []);
 
   // USD is the base currency (source data from AWS).

@@ -20,7 +20,7 @@ export default function HomePage() {
             />
             <span className="text-sm font-semibold text-muted-foreground">|</span>
             <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-lg font-bold text-transparent">
-              Nimbus
+              FinOps AI
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-              Nimbus unifies cost visibility, optimization, and governance across
+              FinOps AI unifies cost visibility, optimization, and governance across
               AWS, Azure, GCP, and Kubernetes — in a single platform your finance
               and engineering teams will actually use.
             </p>
@@ -169,11 +169,11 @@ export default function HomePage() {
             <Image src="/images/acc-logo.png" alt="ACC" width={60} height={28} className="h-6 w-auto" />
             <span className="text-sm font-semibold text-muted-foreground">|</span>
             <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-sm font-bold text-transparent">
-              Nimbus
+              FinOps AI
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Nimbus — Cloud FinOps Platform by ACC
+            FinOps AI — Cloud FinOps Platform by ACC
           </p>
         </div>
       </footer>

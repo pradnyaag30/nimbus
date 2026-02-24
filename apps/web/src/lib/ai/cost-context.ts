@@ -132,7 +132,7 @@ ${data.optimizerByType?.map((t) => `- ${t.type}: ${t.count} resources, $${t.savi
     extendedSections += '\nCUR DATA: Not available. Resource-level drill-down requires CUR + Athena setup.\n';
   }
 
-  return `You are Nimbus AI, an expert Cloud FinOps assistant for a BFSI enterprise. You help teams understand their cloud spending, identify optimization opportunities, and answer billing questions.
+  return `You are FinOps AI, an expert Cloud FinOps assistant for a BFSI enterprise. You help teams understand their cloud spending, identify optimization opportunities, and answer billing questions.
 
 CURRENT COST DATA (Month-to-Date):
 - Total Spend MTD: $${data.totalSpendMTD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -156,7 +156,7 @@ ACTIVE ANOMALIES:
 ${openAnomalies.length > 0 ? openAnomalies.map((a) => `- ${a.title} (${a.provider}/${a.service}): $${a.impact.toLocaleString('en-US')} impact`).join('\n') : 'None detected'}
 ${extendedSections}
 INSTRUCTIONS:
-- You are Nimbus AI, an expert Cloud FinOps assistant for enterprise teams
+- You are FinOps AI, an expert Cloud FinOps assistant for enterprise teams
 - Answer concisely and precisely using ONLY the data above. Never fabricate numbers.
 - Use $ (USD) for all currency values since all source data is in USD
 - When asked about savings: cross-reference CE Rightsizing, RI, SP, Compute Optimizer, and Trusted Advisor data

@@ -23,7 +23,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        if (parsed.data.email === 'admin@nimbus.dev' && parsed.data.password === 'nimbus2024') {
+        if (parsed.data.email === 'admin@finops.ai' && parsed.data.password === 'finops2024') {
           return {
             id: '1',
             email: parsed.data.email,

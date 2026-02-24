@@ -31,7 +31,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hi! I'm **Nimbus AI**, your Cloud FinOps assistant. Ask me about your cloud costs, top services, anomalies, budgets, or optimization recommendations.",
+        "Hi! I'm **FinOps AI**, your Cloud FinOps assistant. Ask me about your cloud costs, top services, anomalies, budgets, or optimization recommendations.",
       timestamp: new Date(),
     },
   ]);
@@ -123,7 +123,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">Nimbus AI</h3>
+            <h3 className="text-sm font-semibold">FinOps AI</h3>
             <p className="text-xs text-muted-foreground">Cloud FinOps Assistant</p>
           </div>
         </div>
@@ -229,7 +229,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
           </button>
         </form>
         <p className="mt-2 text-center text-[10px] text-muted-foreground">
-          Nimbus AI analyses your cloud cost data to provide insights
+          FinOps AI analyses your cloud cost data to provide insights
         </p>
       </div>
     </div>

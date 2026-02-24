@@ -190,10 +190,10 @@ export function AiInsightsCards() {
           <h2 className="text-lg font-semibold">AI-Powered Insights</h2>
           <p className="text-xs text-muted-foreground">
             {source === 'ai'
-              ? 'Powered by Nimbus AI'
+              ? 'Powered by FinOps AI'
               : source === 'cached'
-                ? 'Powered by Nimbus AI (cached)'
-                : 'Powered by Nimbus analytics'}
+                ? 'Powered by FinOps AI (cached)'
+                : 'Powered by FinOps AI analytics'}
           </p>
         </div>
       </div>

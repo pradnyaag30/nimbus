@@ -315,7 +315,7 @@ export function TvDashboard({
 
       {/* Status Bar */}
       <div className="mt-4 flex items-center justify-between rounded-lg bg-card/50 px-4 py-2 text-xs text-muted-foreground">
-        <span>Nimbus Cloud FinOps Platform v0.1.0</span>
+        <span>FinOps AI — Cloud FinOps Platform v1.0</span>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
             <span className={`h-1.5 w-1.5 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'}`} />

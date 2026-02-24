@@ -199,7 +199,7 @@ export function BudgetsClient({
           <h3 className="mt-3 font-semibold">No AWS Budgets Configured</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
             Create your first budget in AWS to get threshold alerts and accurate budget tracking.
-            Nimbus will automatically sync your budgets.
+            FinOps AI will automatically sync your budgets.
           </p>
           <button
             onClick={handleCreateBudget}

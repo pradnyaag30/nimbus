@@ -8,10 +8,10 @@ import '@/styles/globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nimbus — Cloud FinOps Platform',
-    template: '%s | Nimbus',
+    default: 'FinOps AI — Cloud FinOps Platform',
+    template: '%s | FinOps AI',
   },
-  description: 'Nimbus by ACC — Unified Cloud FinOps Platform for cost visibility, optimization, and governance.',
+  description: 'FinOps AI by ACC — Unified Cloud FinOps Platform for cost visibility, optimization, and governance.',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',

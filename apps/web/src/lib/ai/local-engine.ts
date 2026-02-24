@@ -30,7 +30,7 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
   // --- GREETINGS & HELP ---
   if (has(tokens, 'hello', 'hi', 'hey', 'help', 'what can')) {
     const hasData = data.totalSpendMTD > 0;
-    return `I'm **Nimbus AI**, your Cloud FinOps assistant powered by live AWS Cost Explorer data.\n\n${hasData ? `📊 **Connected to AWS Account** — tracking real spend data.\n\n` : ''}I can answer questions about:\n\n- **Spending**: "total spend", "cost this month", "how much are we spending?"\n- **Services**: "top services", "which service costs most?", "EC2 cost"\n- **Trends**: "cost trend", "month over month", "are costs going up?"\n- **Forecasts**: "projected spend", "forecast", "end of month estimate"\n- **Breakdown**: "AWS breakdown", "service breakdown"\n- **Summary**: "give me a full report", "executive summary"\n\nJust ask in plain language!`;
+    return `I'm **FinOps AI**, your Cloud FinOps assistant powered by live AWS Cost Explorer data.\n\n${hasData ? `📊 **Connected to AWS Account** — tracking real spend data.\n\n` : ''}I can answer questions about:\n\n- **Spending**: "total spend", "cost this month", "how much are we spending?"\n- **Services**: "top services", "which service costs most?", "EC2 cost"\n- **Trends**: "cost trend", "month over month", "are costs going up?"\n- **Forecasts**: "projected spend", "forecast", "end of month estimate"\n- **Breakdown**: "AWS breakdown", "service breakdown"\n- **Summary**: "give me a full report", "executive summary"\n\nJust ask in plain language!`;
   }
 
   // --- TOTAL SPEND / OVERVIEW ---
@@ -282,7 +282,7 @@ export function generateLocalResponse(query: string, data: CostSummary): string 
 // --- Helper functions ---
 
 function providerNotConnected(provider: string): string {
-  return `**${provider}** is not currently connected to Nimbus.\n\nOnly **AWS** is connected right now. To add ${provider}, go to **Cloud Accounts** and connect your ${provider} subscription/project.\n\nWould you like to see AWS cost data instead?`;
+  return `**${provider}** is not currently connected to FinOps AI.\n\nOnly **AWS** is connected right now. To add ${provider}, go to **Cloud Accounts** and connect your ${provider} subscription/project.\n\nWould you like to see AWS cost data instead?`;
 }
 
 function awsBreakdown(data: CostSummary): string {
@@ -307,7 +307,7 @@ function awsBreakdown(data: CostSummary): string {
 
 function nocSummary(data: CostSummary): string {
   if (data.totalSpendMTD === 0) {
-    return `**Nimbus FinOps Status:**\n\nNo cost data available. Please ensure AWS credentials are configured and the account has active resources.`;
+    return `**FinOps AI Status:**\n\nNo cost data available. Please ensure AWS credentials are configured and the account has active resources.`;
   }
 
   const spiking = data.topServices.filter((s) => s.change > 20);
