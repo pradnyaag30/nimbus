@@ -53,7 +53,7 @@ const responseExample = `{
 }`;
 
 const curlExample = `curl -s -H "Authorization: Bearer YOUR_SIEM_API_KEY" \\
-  "https://your-nimbus-host/api/siem/audit-logs?since=2026-02-01T00:00:00Z&limit=50&category=AUTH"`;
+  "https://your-finops-host/api/siem/audit-logs?since=2026-02-01T00:00:00Z&limit=50&category=AUTH"`;
 
 export function SiemDocsClient() {
   return (
@@ -66,7 +66,7 @@ export function SiemDocsClient() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">SIEM API Documentation</h1>
           <p className="text-sm text-muted-foreground">
-            Integrate Nimbus audit logs with your SIEM platform (Splunk, QRadar, Sentinel, etc.)
+            Integrate FinOps AI audit logs with your SIEM platform (Splunk, QRadar, Sentinel, etc.)
           </p>
         </div>
       </div>
@@ -176,7 +176,7 @@ export function SiemDocsClient() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Actions Reference</h2>
         <p className="text-sm text-muted-foreground">
-          The following audit actions are tracked by Nimbus. Use these values for filtering and
+          The following audit actions are tracked by FinOps AI. Use these values for filtering and
           alert rule configuration in your SIEM platform.
         </p>
         <div className="overflow-x-auto rounded-lg border">
