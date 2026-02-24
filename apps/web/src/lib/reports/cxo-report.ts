@@ -374,7 +374,7 @@ function buildProviderBreakdownSlide(
   const labels = data.spendByProvider.map((p) => p.provider);
   const values = data.spendByProvider.map((p) => p.spend);
 
-  slide.addChart('bar' as PptxGenJS.ChartType, [
+  slide.addChart('bar', [
     {
       name: 'Spend',
       labels,
@@ -387,7 +387,7 @@ function buildProviderBreakdownSlide(
     h: 3.5,
     barDir: 'bar',
     showValue: true,
-    valueFontSize: 10,
+    dataLabelFontSize: 10,
     catAxisLabelFontSize: 11,
     valAxisLabelFontSize: 9,
     chartColors: chartColors.slice(0, data.spendByProvider.length),

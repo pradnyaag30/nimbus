@@ -1,4 +1,4 @@
-import type { UserRole } from '@prisma/client';
+import type { UserRole } from '@/lib/auth/types';
 
 const ROLE_LEVEL: Record<UserRole, number> = {
   VIEWER: 0,

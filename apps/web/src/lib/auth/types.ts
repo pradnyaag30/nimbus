@@ -1,6 +1,15 @@
-import type { UserRole } from '@prisma/client';
+/**
+ * Enterprise RBAC types — defined locally to decouple from Prisma generate.
+ * These mirror the enums in schema.prisma and will be reconciled
+ * once `prisma migrate` is run for the enterprise models.
+ */
 
-export type { UserRole } from '@prisma/client';
+export type UserRole =
+  | 'VIEWER'
+  | 'EDITOR'
+  | 'AUDITOR'
+  | 'FINOPS_ADMIN'
+  | 'SUPER_ADMIN';
 
 export interface SessionUser {
   id: string;
@@ -14,12 +23,5 @@ export interface SessionUser {
 declare module 'next-auth' {
   interface Session {
     user: SessionUser;
-  }
-}
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    role: UserRole;
-    tenantId: string;
   }
 }
