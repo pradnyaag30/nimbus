@@ -20,7 +20,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onOpenChat={() => setChatOpen(true)} userRole={user?.role as import('@/lib/auth/types').UserRole} />
+      <Sidebar userRole={user?.role as import('@/lib/auth/types').UserRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar user={user} onOpenChat={() => setChatOpen(true)} />
         <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>

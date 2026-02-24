@@ -18,7 +18,6 @@ import {
   Cloud,
   Settings,
   Tags,
-  Sparkles,
   ChevronRight,
   FileBarChart,
   Scale,
@@ -88,11 +87,10 @@ const navSections: NavSection[] = [
 ];
 
 interface SidebarProps {
-  onOpenChat?: () => void;
   userRole?: UserRole;
 }
 
-export function Sidebar({ onOpenChat, userRole = 'FINOPS_ADMIN' }: SidebarProps) {
+export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
 
@@ -193,21 +191,6 @@ export function Sidebar({ onOpenChat, userRole = 'FINOPS_ADMIN' }: SidebarProps)
             </div>
           ))}
         </nav>
-
-        {/* AI Chat Button */}
-        <div className="px-2 pb-2">
-          <button
-            onClick={onOpenChat}
-            title="Ask FinOps AI"
-            className={cn(
-              'flex w-full items-center gap-3 rounded-lg bg-gradient-to-r from-primary to-blue-500 text-sm font-medium text-white shadow-md transition-all hover:shadow-lg hover:brightness-110',
-              expanded ? 'px-3 py-2.5' : 'justify-center py-2.5',
-            )}
-          >
-            <Sparkles className="h-4 w-4 shrink-0" />
-            {expanded && <span>Ask FinOps AI</span>}
-          </button>
-        </div>
 
         {/* Footer */}
         {expanded && (

@@ -27,7 +27,7 @@ export function ReportsClient() {
     setError(null);
 
     try {
-      const res = await fetch('/api/reports/cxo', { method: 'POST' });
+      const res = await fetch('/api/reports/cxo');
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
