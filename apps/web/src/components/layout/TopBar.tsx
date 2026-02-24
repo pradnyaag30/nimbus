@@ -3,6 +3,7 @@
 import { signOut } from 'next-auth/react';
 import { Moon, Sun, Bell, LogOut, Sparkles } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 interface TopBarProps {
   user: {
@@ -50,9 +51,7 @@ export function TopBar({ user, onOpenChat }: TopBarProps) {
 
         {/* User menu */}
         <div className="ml-2 flex items-center gap-3 border-l pl-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-            {(user.name || 'U').charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar name={user.name || 'User'} size="sm" />
           <div className="hidden sm:block">
             <p className="text-sm font-medium leading-none">{user.name}</p>
             <p className="text-xs text-muted-foreground">{user.email}</p>

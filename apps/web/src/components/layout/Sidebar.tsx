@@ -5,48 +5,100 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { canSeeSection, type SidebarSection } from '@/lib/auth/rbac';
+import type { UserRole } from '@/lib/auth/types';
 import {
   LayoutDashboard,
-  DollarSign,
-  TrendingDown,
+  BarChart3,
+  Wallet,
   Lightbulb,
-  PieChart,
-  Server,
-  Settings,
-  Shield,
+  AlertTriangle,
   ShieldCheck,
-  Tag,
+  Server,
   Cloud,
+  Settings,
+  Tags,
   Sparkles,
-  Monitor,
   ChevronRight,
+  FileBarChart,
+  Scale,
+  ScrollText,
+  Users,
+  Database,
+  Activity,
+  FileText,
+  type LucideIcon,
 } from 'lucide-react';
 
-const navigation = [
-  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Cost Explorer', href: '/dashboard/costs', icon: DollarSign },
-  { name: 'Budgets', href: '/dashboard/budgets', icon: PieChart },
-  { name: 'Recommendations', href: '/dashboard/recommendations', icon: Lightbulb },
-  { name: 'Anomalies', href: '/dashboard/anomalies', icon: TrendingDown },
-  { name: 'Trusted Advisor', href: '/dashboard/trusted-advisor', icon: ShieldCheck },
-  { name: 'Resources', href: '/dashboard/resources', icon: Server },
-  { name: 'Cloud Accounts', href: '/dashboard/accounts', icon: Cloud },
-];
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
 
-const secondaryNav = [
-  { name: 'Governance', href: '/dashboard/governance', icon: Shield },
-  { name: 'Tag Governance', href: '/dashboard/tag-governance', icon: Tag },
-  { name: 'Executive Dashboard', href: '/dashboard/tv', icon: Monitor },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+interface NavSection {
+  id: SidebarSection;
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    id: 'analytics',
+    label: 'ANALYTICS',
+    items: [
+      { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+      { name: 'Cost Explorer', href: '/dashboard/costs', icon: BarChart3 },
+      { name: 'Budgets', href: '/dashboard/budgets', icon: Wallet },
+      { name: 'Recommendations', href: '/dashboard/recommendations', icon: Lightbulb },
+      { name: 'Anomalies', href: '/dashboard/anomalies', icon: AlertTriangle },
+      { name: 'Trusted Advisor', href: '/dashboard/trusted-advisor', icon: ShieldCheck },
+      { name: 'Resources', href: '/dashboard/resources', icon: Server },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'REPORTS',
+    items: [
+      { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
+    ],
+  },
+  {
+    id: 'governance',
+    label: 'GOVERNANCE',
+    items: [
+      { name: 'Compliance', href: '/dashboard/compliance', icon: ShieldCheck },
+      { name: 'Governance', href: '/dashboard/governance', icon: Scale },
+      { name: 'Tag Governance', href: '/dashboard/tag-governance', icon: Tags },
+      { name: 'Audit Trail', href: '/dashboard/audit-trail', icon: ScrollText },
+    ],
+  },
+  {
+    id: 'administration',
+    label: 'ADMINISTRATION',
+    items: [
+      { name: 'Users', href: '/dashboard/users', icon: Users },
+      { name: 'Masters', href: '/dashboard/masters', icon: Database },
+      { name: 'Cloud Accounts', href: '/dashboard/accounts', icon: Cloud },
+      { name: 'System Status', href: '/dashboard/system-status', icon: Activity },
+      { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+      { name: 'SIEM Docs', href: '/dashboard/siem-docs', icon: FileText },
+    ],
+  },
 ];
 
 interface SidebarProps {
   onOpenChat?: () => void;
+  userRole?: UserRole;
 }
 
-export function Sidebar({ onOpenChat }: SidebarProps) {
+export function Sidebar({ onOpenChat, userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
+
+  const visibleSections = navSections.filter((section) =>
+    canSeeSection(userRole, section.id),
+  );
 
   return (
     <>
@@ -97,62 +149,49 @@ export function Sidebar({ onOpenChat }: SidebarProps) {
         )}
 
         {/* Main Navigation */}
-        <nav className="flex-1 space-y-1 overflow-hidden px-2 py-3">
-          {expanded && (
-            <div className="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Analytics
-            </div>
-          )}
-          {navigation.map((item) => {
-            const isActive =
-              item.href === '/dashboard'
-                ? pathname === '/dashboard'
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                title={item.name}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                  expanded ? 'px-3' : 'justify-center',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {expanded && <span className="truncate">{item.name}</span>}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 py-3">
+          {visibleSections.map((section, sectionIndex) => (
+            <div key={section.id}>
+              {/* Section divider — border when collapsed, label when expanded */}
+              {expanded ? (
+                <div
+                  className={cn(
+                    'mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground',
+                    sectionIndex > 0 && 'mt-5',
+                  )}
+                >
+                  {section.label}
+                </div>
+              ) : (
+                sectionIndex > 0 && <div className="my-3 border-t" />
+              )}
 
-          {expanded && (
-            <div className="mb-2 mt-5 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Management
+              {/* Section items */}
+              {section.items.map((item) => {
+                const isActive =
+                  item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    title={item.name}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
+                      expanded ? 'px-3' : 'justify-center',
+                      isActive
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 shrink-0" />
+                    {expanded && <span className="truncate">{item.name}</span>}
+                  </Link>
+                );
+              })}
             </div>
-          )}
-          {!expanded && <div className="my-3 border-t" />}
-          {secondaryNav.map((item) => {
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                title={item.name}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                  expanded ? 'px-3' : 'justify-center',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {expanded && <span className="truncate">{item.name}</span>}
-              </Link>
-            );
-          })}
+          ))}
         </nav>
 
         {/* AI Chat Button */}
@@ -177,7 +216,7 @@ export function Sidebar({ onOpenChat }: SidebarProps) {
               <div className="flex items-center gap-2">
                 <Image src="/images/acc-logo.png" alt="ACC" width={40} height={19} className="h-4 w-auto" />
               </div>
-              <p className="mt-1 text-[10px] text-muted-foreground">FinOps AI v1.0 — Cloud FinOps Platform</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">FinOps AI v2.0 — Cloud FinOps Platform</p>
             </div>
           </div>
         )}

@@ -8,6 +8,22 @@ interface ExchangeRateInfo {
   source: string;
 }
 
+// --- Offline fallback rates --------------------------------------------------
+// Hardcoded rates for air-gapped / offline BFSI deployments where external
+// exchange-rate APIs are unreachable. Values are approximate and should be
+// updated periodically during maintenance windows.
+
+const OFFLINE_RATES: Record<string, number> = {
+  USD: 1,
+  INR: 83.5,
+  EUR: 0.92,
+  GBP: 0.79,
+  JPY: 150.0,
+  AUD: 1.55,
+  CAD: 1.36,
+  SGD: 1.34,
+};
+
 // --- In-memory cache ---------------------------------------------------------
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -96,11 +112,14 @@ export async function getExchangeRateInfo(): Promise<ExchangeRateInfo> {
     return cachedInfo;
   }
 
-  // --- Last resort -----------------------------------------------------------
-  console.warn('[ExchangeRate] All sources failed. Using emergency fallback rate 83.');
+  // --- Last resort: offline hardcoded rates ----------------------------------
+  const offlineInr = OFFLINE_RATES['INR'] ?? 83;
+  console.warn(
+    `[ExchangeRate] All sources failed. Using offline fallback rate ${offlineInr}.`,
+  );
   return {
-    rate: 83,
+    rate: offlineInr,
     lastUpdated: new Date().toISOString(),
-    source: 'fallback (offline)',
+    source: 'offline (hardcoded)',
   };
 }

@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import { z } from 'zod';
+import '@/lib/auth/types';
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -58,7 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     jwt({ token, user }) {
       if (user) {
-        token.role = 'admin';
+        token.role = 'FINOPS_ADMIN' as const;
         token.tenantId = 'default';
       }
       return token;
@@ -66,8 +67,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       if (token) {
         session.user.id = token.sub!;
-        (session.user as any).role = token.role;
-        (session.user as any).tenantId = token.tenantId;
+        session.user.role = token.role;
+        session.user.tenantId = token.tenantId;
       }
       return session;
     },
