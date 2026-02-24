@@ -357,8 +357,8 @@ export async function getUntaggedResourceCosts(
         WHEN resource_tags_user_environment IS NULL OR resource_tags_user_environment = '' THEN 'Missing: Environment'
         WHEN resource_tags_user_team IS NULL OR resource_tags_user_team = '' THEN 'Missing: Team'
         WHEN resource_tags_user_costcenter IS NULL OR resource_tags_user_costcenter = '' THEN 'Missing: CostCenter'
-        WHEN resource_tags_user_project IS NULL OR resource_tags_user_project = '' THEN 'Missing: Project'
-        WHEN resource_tags_user_owner IS NULL OR resource_tags_user_owner = '' THEN 'Missing: Owner'
+        WHEN resource_tags_user_projectname IS NULL OR resource_tags_user_projectname = '' THEN 'Missing: ProjectName'
+        WHEN resource_tags_user_projectowner IS NULL OR resource_tags_user_projectowner = '' THEN 'Missing: ProjectOwner'
         ELSE 'Partial'
       END AS missing_tag
     FROM "${ATHENA_TABLE}"
@@ -370,8 +370,8 @@ export async function getUntaggedResourceCosts(
         resource_tags_user_environment IS NULL OR resource_tags_user_environment = ''
         OR resource_tags_user_team IS NULL OR resource_tags_user_team = ''
         OR resource_tags_user_costcenter IS NULL OR resource_tags_user_costcenter = ''
-        OR resource_tags_user_project IS NULL OR resource_tags_user_project = ''
-        OR resource_tags_user_owner IS NULL OR resource_tags_user_owner = ''
+        OR resource_tags_user_projectname IS NULL OR resource_tags_user_projectname = ''
+        OR resource_tags_user_projectowner IS NULL OR resource_tags_user_projectowner = ''
       )
     GROUP BY
       line_item_resource_id,
@@ -381,8 +381,8 @@ export async function getUntaggedResourceCosts(
       resource_tags_user_environment,
       resource_tags_user_team,
       resource_tags_user_costcenter,
-      resource_tags_user_project,
-      resource_tags_user_owner
+      resource_tags_user_projectname,
+      resource_tags_user_projectowner
     ORDER BY total_cost DESC
     LIMIT 50
   `;

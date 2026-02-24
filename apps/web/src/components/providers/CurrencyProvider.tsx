@@ -21,6 +21,8 @@ interface CurrencyContextValue {
   symbol: string;
   /** The multiplier applied to USD values for the current display currency. */
   rate: number;
+  /** Always the USD → INR exchange rate, regardless of selected currency. */
+  usdToInrRate: number;
   /** Live exchange-rate metadata (source + timestamp). */
   rateInfo: RateInfo | null;
 }
@@ -113,6 +115,7 @@ export function CurrencyProvider({
         formatCompact,
         symbol: config.symbol,
         rate: config.rate,
+        usdToInrRate,
         rateInfo,
       }}
     >

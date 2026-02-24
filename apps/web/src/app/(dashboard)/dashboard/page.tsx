@@ -18,6 +18,8 @@ import { TagComplianceCard } from './components/TagComplianceCard';
 import { SavingsOpportunitiesCard } from './components/SavingsOpportunitiesCard';
 import { NativeAnomaliesCard } from './components/NativeAnomaliesCard';
 import { AiInsightsCards } from './components/AiInsightsCards';
+import { DashboardFilterBar } from './components/DashboardFilterBar';
+import { Suspense } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 export const metadata = { title: 'Dashboard' };
@@ -28,12 +30,18 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Cloud spend overview — Account {data.accountId}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Cloud spend overview — Account {data.accountId}
+          </p>
+        </div>
       </div>
+
+      <Suspense fallback={null}>
+        <DashboardFilterBar accountId={data.accountId} />
+      </Suspense>
 
       {data.error && (
         <div className="flex items-center gap-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4">

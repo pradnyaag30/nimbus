@@ -6,7 +6,7 @@ import {
 
 // --- Constants ---------------------------------------------------------------
 
-const REQUIRED_TAGS = ['Environment', 'Team', 'CostCenter', 'Project', 'Owner'];
+const REQUIRED_TAGS = ['Environment', 'Team', 'CostCenter', 'ProjectName', 'ProjectOwner'];
 
 const COST_ALLOCATION_PATTERNS = [/cost/i, /billing/i, /finance/i, /chargeback/i];
 const COST_ALLOCATION_EXACT = ['aws:createdBy'];

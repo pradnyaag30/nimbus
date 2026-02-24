@@ -71,7 +71,7 @@ function TagGovernanceUnavailable({ errorMessage }: { errorMessage?: string }) {
 
         <div className="mt-8 grid w-full max-w-lg gap-3">
           {[
-            { icon: Tag, label: 'Required Tags', description: 'Enforce Environment, Team, CostCenter, Project, and Owner tags' },
+            { icon: Tag, label: 'Required Tags', description: 'Enforce Environment, Team, CostCenter, ProjectName, and ProjectOwner tags' },
             { icon: Search, label: 'Compliance Tracking', description: 'Monitor tag compliance across all AWS resources' },
             { icon: CheckCircle, label: 'Cost Allocation Tags', description: 'Track which tags are activated for cost attribution' },
             { icon: AlertTriangle, label: 'Gap Analysis', description: 'Identify untagged resources that need attention' },
@@ -296,7 +296,7 @@ export function TagGovernanceClient({ data }: TagGovernanceClientProps) {
             About Tag Governance
           </p>
           <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-            Tag compliance is checked against required tags: Environment, Team, CostCenter, Project, Owner.
+            Tag compliance is checked against required tags: Environment, Team, CostCenter, ProjectName, ProjectOwner.
             Enable cost allocation tags in AWS Billing Console for accurate cost attribution. Tag data is
             fetched from the AWS Resource Groups Tagging API and cached for performance.
           </p>

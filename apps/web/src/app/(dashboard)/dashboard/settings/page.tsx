@@ -3,7 +3,7 @@
 import { useCurrency, type Currency } from '@/components/providers/CurrencyProvider';
 
 export default function SettingsPage() {
-  const { currency, setCurrency, rate, rateInfo } = useCurrency();
+  const { currency, setCurrency, usdToInrRate, rateInfo } = useCurrency();
 
   return (
     <div className="space-y-6 animate-in">
@@ -83,7 +83,7 @@ export default function SettingsPage() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Exchange rate: 1 USD = {rate.toFixed(2)} INR
+                Exchange rate: 1 USD = {usdToInrRate.toFixed(2)} INR
                 {rateInfo && (
                   <span className="ml-1 opacity-70">
                     (via {rateInfo.source}, updated{' '}
@@ -126,7 +126,7 @@ export default function SettingsPage() {
           <div className="mt-4">
             <div className="rounded-md bg-muted p-3">
               <p className="font-mono text-xs text-muted-foreground">
-                nmbs_prod_xxxxxxxxxxxx
+                fops_prod_xxxxxxxxxxxx
               </p>
             </div>
             <button className="mt-3 inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium transition-colors hover:bg-accent">

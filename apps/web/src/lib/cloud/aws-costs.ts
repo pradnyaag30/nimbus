@@ -643,6 +643,92 @@ export async function getNativeAnomalies(): Promise<NativeAnomalySummary> {
   }
 }
 
+// --- Charge Type Breakdown (On-Demand / RI / SP / Spot) ----------------------
+
+export interface ChargeTypeBreakdown {
+  chargeType: string;
+  cost: number;
+  percentage: number;
+}
+
+export async function getChargeTypeBreakdown(): Promise<ChargeTypeBreakdown[]> {
+  const client = createCostExplorerClient();
+  const now = new Date();
+  const currentMonthStart = getMonthStart(now);
+
+  try {
+    const response = await client.send(new GetCostAndUsageCommand({
+      TimePeriod: { Start: formatDate(currentMonthStart), End: formatDate(now) },
+      Granularity: 'MONTHLY',
+      Metrics: ['UnblendedCost'],
+      GroupBy: [{ Type: 'DIMENSION', Key: 'PURCHASE_TYPE' }],
+    }));
+
+    const results: ChargeTypeBreakdown[] = [];
+    let total = 0;
+
+    for (const group of response.ResultsByTime?.[0]?.Groups || []) {
+      const chargeType = group.Keys?.[0] || 'Other';
+      const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || '0');
+      if (cost < 0.01) continue;
+      total += cost;
+      results.push({ chargeType, cost, percentage: 0 });
+    }
+
+    // Calculate percentages
+    for (const item of results) {
+      item.percentage = total > 0 ? (item.cost / total) * 100 : 0;
+    }
+
+    return results.sort((a, b) => b.cost - a.cost);
+  } catch {
+    return [];
+  }
+}
+
+// --- Region Cost Breakdown ---------------------------------------------------
+
+export interface RegionCostBreakdown {
+  region: string;
+  cost: number;
+  percentage: number;
+}
+
+export async function getRegionCostBreakdown(): Promise<RegionCostBreakdown[]> {
+  const client = createCostExplorerClient();
+  const now = new Date();
+  const currentMonthStart = getMonthStart(now);
+
+  try {
+    const response = await client.send(new GetCostAndUsageCommand({
+      TimePeriod: { Start: formatDate(currentMonthStart), End: formatDate(now) },
+      Granularity: 'MONTHLY',
+      Metrics: ['UnblendedCost'],
+      GroupBy: [{ Type: 'DIMENSION', Key: 'REGION' }],
+    }));
+
+    const results: RegionCostBreakdown[] = [];
+    let total = 0;
+
+    for (const group of response.ResultsByTime?.[0]?.Groups || []) {
+      const region = group.Keys?.[0] || 'global';
+      const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || '0');
+      if (cost < 0.01) continue;
+      total += cost;
+      results.push({ region, cost, percentage: 0 });
+    }
+
+    // Calculate percentages
+    for (const item of results) {
+      item.percentage = total > 0 ? (item.cost / total) * 100 : 0;
+    }
+
+    return results.sort((a, b) => b.cost - a.cost);
+  } catch {
+    return [];
+  }
+}
+
 // --- Main Dashboard Data Function --------------------------------------------
 
 export async function fetchAwsDashboardData(): Promise<DashboardData> {
