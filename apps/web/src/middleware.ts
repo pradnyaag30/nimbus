@@ -1,5 +1,5 @@
 export { auth as middleware } from '@/lib/auth/config';
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path((?!health|auth).*)'],
+  matcher: ['/dashboard/:path*', '/api/:path((?!health|auth|siem).*)'],
 };
