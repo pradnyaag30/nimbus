@@ -115,7 +115,7 @@ export function FinOpsMaturityScorecard({
       tip: hasTrustedAdvisor ? 'AWS Trusted Advisor checks active' : 'Requires Business/Enterprise Support',
     },
     {
-      label: 'Budget Governance',
+      label: 'Cloud Budget Alerts',
       status: getDimensionStatus(!!hasBudgetGovernance, hasBudgetTracking),
       score: hasBudgetGovernance ? 2 : hasBudgetTracking ? 1 : 0,
       maxScore: 2,
