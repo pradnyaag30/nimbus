@@ -17,7 +17,15 @@ interface BurnRateCardProps {
 
 type PaceStatus = 'over' | 'slight' | 'on-pace';
 
-function getPaceStatus(burnRatio: number): PaceStatus {
+function getPaceStatus(burnRatio: number, daysRemaining: number, forecastedSpend: number, budget: number): PaceStatus {
+  // Near end of month: compare projected EOM (forecast) vs budget directly
+  if (daysRemaining <= 3 && budget > 0) {
+    const forecastRatio = forecastedSpend / budget;
+    if (forecastRatio > 1.1) return 'over';
+    if (forecastRatio > 1.0) return 'slight';
+    return 'on-pace';
+  }
+  // During the month: use daily burn ratio
   if (burnRatio > 1.1) return 'over';
   if (burnRatio > 1.0) return 'slight';
   return 'on-pace';
@@ -80,13 +88,23 @@ export function BurnRateCard({
 
   const currentBurnRate = totalSpendMTD / Math.max(dayOfMonth, 1);
 
-  // Use real AWS Budgets when available, otherwise use AWS Cost Forecast
+  // Determine the budget target:
+  // 1. Real AWS Budget (best) → actual budget limit
+  // 2. Previous month total (fallback) → last month's actual spend as benchmark
+  // NEVER use forecastedSpend as budget — comparing forecast against itself is circular
   const hasRealBudget = awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0;
   const budget = hasRealBudget
     ? awsBudgets.totalBudgetLimit
-    : forecastedSpend > 0
-      ? forecastedSpend
-      : previousMonthTotal;
+    : previousMonthTotal > 0
+      ? previousMonthTotal
+      : forecastedSpend;
+
+  const budgetLabel = hasRealBudget
+    ? 'AWS Budget'
+    : previousMonthTotal > 0
+      ? 'Last Month (benchmark)'
+      : 'Forecast Target';
+
   const budgetRemaining = Math.max(budget - totalSpendMTD, 0);
   const requiredBurnRate = daysRemaining > 0 ? budgetRemaining / daysRemaining : 0;
 
@@ -95,7 +113,7 @@ export function BurnRateCard({
   const projectedEOM = currentBurnRate * daysInMonth;
   const monthProgress = (dayOfMonth / daysInMonth) * 100;
 
-  const paceStatus = getPaceStatus(burnRatio);
+  const paceStatus = getPaceStatus(burnRatio, daysRemaining, forecastedSpend, budget);
   const colors = getPaceColor(paceStatus);
   const paceLabel = getPaceLabel(paceStatus);
 
@@ -159,7 +177,7 @@ export function BurnRateCard({
 
       {/* Budget */}
       <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{hasRealBudget ? 'AWS Budget' : 'Forecast Target'}</span>
+        <span className="text-muted-foreground">{budgetLabel}</span>
         <span className="font-medium">{format(budget)}</span>
       </div>
 

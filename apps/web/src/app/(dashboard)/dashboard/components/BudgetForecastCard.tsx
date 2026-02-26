@@ -49,12 +49,13 @@ export function BudgetForecastCard({
 }: BudgetForecastCardProps) {
   const { format } = useCurrency();
 
-  // Use real AWS Budgets when available, otherwise use AWS Cost Forecast
+  // Use real AWS Budgets when available, otherwise previous month as benchmark.
+  // NEVER use forecastedSpend as budget — comparing forecast vs itself is always 100%.
   const hasRealBudget = awsBudgets?.status === 'active' && awsBudgets.totalBudgetLimit > 0;
   const budget = hasRealBudget
     ? awsBudgets.totalBudgetLimit
-    : forecastedSpend > 0
-      ? forecastedSpend
+    : previousMonthTotal > 0
+      ? previousMonthTotal
       : 0;
   const variance = forecastedSpend - budget;
   const usagePct = budget > 0 ? (totalSpendMTD / budget) * 100 : 0;
@@ -88,7 +89,7 @@ export function BudgetForecastCard({
         <div>
           <h3 className="font-semibold">Budget vs Forecast</h3>
           <p className="text-sm text-muted-foreground">
-            {hasRealBudget ? 'Tracking against AWS Budget' : 'Based on AWS Cost Forecast'}
+            {hasRealBudget ? 'Tracking against AWS Budget' : previousMonthTotal > 0 ? 'Compared to last month spend' : 'No budget configured'}
           </p>
         </div>
         <span

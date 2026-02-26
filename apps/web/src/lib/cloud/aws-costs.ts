@@ -769,11 +769,16 @@ export async function fetchAwsDashboardData(): Promise<DashboardData> {
     ? ((totalSpendMTD - previousMonthTotal) / previousMonthTotal) * 100
     : 0;
 
+  // Use actual days in current month (not hardcoded 30) for accurate fallback forecast
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
   return {
     totalSpendMTD,
     previousMonthTotal,
     changePercentage,
-    forecastedSpend: forecast > 0 ? totalSpendMTD + forecast : totalSpendMTD * (30 / now.getDate()),
+    forecastedSpend: forecast > 0
+      ? totalSpendMTD + forecast
+      : totalSpendMTD * (daysInMonth / Math.max(now.getDate(), 1)),
     monthlyCosts: monthlyTrend,
     topServices,
     accountId: validation.accountId || 'unknown',

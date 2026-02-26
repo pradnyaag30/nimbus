@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { canSeeSection, type SidebarSection } from '@/lib/auth/rbac';
 import type { UserRole } from '@/lib/auth/types';
@@ -19,6 +19,7 @@ import {
   Settings,
   Tags,
   ChevronRight,
+  ChevronDown,
   FileBarChart,
   Scale,
   ScrollText,
@@ -40,13 +41,15 @@ interface NavItem {
 interface NavSection {
   id: SidebarSection;
   label: string;
+  icon: LucideIcon;
   items: NavItem[];
 }
 
 const navSections: NavSection[] = [
   {
     id: 'analytics',
-    label: 'ANALYTICS',
+    label: 'Analytics',
+    icon: BarChart3,
     items: [
       { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
       { name: 'Cost Explorer', href: '/dashboard/costs', icon: BarChart3 },
@@ -61,14 +64,16 @@ const navSections: NavSection[] = [
   },
   {
     id: 'reports',
-    label: 'REPORTS',
+    label: 'Reports',
+    icon: FileBarChart,
     items: [
-      { name: 'Reports', href: '/dashboard/reports', icon: FileBarChart },
+      { name: 'CXO Summary', href: '/dashboard/reports', icon: FileBarChart },
     ],
   },
   {
     id: 'governance',
-    label: 'GOVERNANCE',
+    label: 'Governance',
+    icon: ShieldCheck,
     items: [
       { name: 'Compliance', href: '/dashboard/compliance', icon: ShieldCheck },
       { name: 'Governance', href: '/dashboard/governance', icon: Scale },
@@ -78,7 +83,8 @@ const navSections: NavSection[] = [
   },
   {
     id: 'administration',
-    label: 'ADMINISTRATION',
+    label: 'Administration',
+    icon: Settings,
     items: [
       { name: 'Users', href: '/dashboard/users', icon: Users },
       { name: 'Masters', href: '/dashboard/masters', icon: Database },
@@ -97,10 +103,33 @@ interface SidebarProps {
 export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const visibleSections = navSections.filter((section) =>
     canSeeSection(userRole, section.id),
   );
+
+  // Auto-open the section that contains the active route
+  const getActiveSection = useCallback(() => {
+    for (const section of visibleSections) {
+      for (const item of section.items) {
+        const isActive = item.href === '/dashboard'
+          ? pathname === '/dashboard'
+          : pathname.startsWith(item.href);
+        if (isActive) return section.id;
+      }
+    }
+    return 'analytics';
+  }, [pathname, visibleSections]);
+
+  useEffect(() => {
+    const activeSection = getActiveSection();
+    setOpenSections((prev) => ({ ...prev, [activeSection]: true }));
+  }, [pathname, getActiveSection]);
+
+  function toggleSection(sectionId: string) {
+    setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  }
 
   return (
     <>
@@ -118,7 +147,7 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
         />
       )}
 
-      {/* Collapsed icon strip */}
+      {/* Sidebar */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-sidebar transition-all duration-300 ease-in-out',
@@ -152,48 +181,78 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
 
         {/* Main Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-2 py-3">
-          {visibleSections.map((section, sectionIndex) => (
-            <div key={section.id}>
-              {/* Section divider — border when collapsed, label when expanded */}
-              {expanded ? (
-                <div
-                  className={cn(
-                    'mb-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground',
-                    sectionIndex > 0 && 'mt-5',
-                  )}
-                >
-                  {section.label}
-                </div>
-              ) : (
-                sectionIndex > 0 && <div className="my-3 border-t" />
-              )}
+          {visibleSections.map((section) => {
+            const isOpen = openSections[section.id] ?? false;
+            const hasActiveChild = section.items.some((item) =>
+              item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href),
+            );
 
-              {/* Section items */}
-              {section.items.map((item) => {
-                const isActive =
-                  item.href === '/dashboard'
-                    ? pathname === '/dashboard'
-                    : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    title={item.name}
+            return (
+              <div key={section.id}>
+                {/* Section Header — collapsible */}
+                {expanded ? (
+                  <button
+                    onClick={() => toggleSection(section.id)}
                     className={cn(
-                      'flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors',
-                      expanded ? 'px-3' : 'justify-center',
-                      isActive
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                      'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      hasActiveChild
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/30',
                     )}
                   >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {expanded && <span className="truncate">{item.name}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+                    <div className="flex items-center gap-2.5">
+                      <section.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{section.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {hasActiveChild && !isOpen && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      )}
+                      <ChevronDown
+                        className={cn(
+                          'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                          isOpen && 'rotate-180',
+                        )}
+                      />
+                    </div>
+                  </button>
+                ) : (
+                  <div className="my-1.5 border-t" />
+                )}
+
+                {/* Section Items — collapsible when expanded, always shown when collapsed */}
+                {(expanded ? isOpen : true) && (
+                  <div className={cn(expanded && 'ml-2 mt-0.5 space-y-0.5 border-l border-border/50 pl-2')}>
+                    {section.items.map((item) => {
+                      const isActive =
+                        item.href === '/dashboard'
+                          ? pathname === '/dashboard'
+                          : pathname.startsWith(item.href);
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          title={item.name}
+                          className={cn(
+                            'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors',
+                            expanded ? 'px-2.5' : 'justify-center py-2',
+                            isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          {expanded && <span className="truncate">{item.name}</span>}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}
