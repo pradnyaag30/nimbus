@@ -769,16 +769,31 @@ export async function fetchAwsDashboardData(): Promise<DashboardData> {
     ? ((totalSpendMTD - previousMonthTotal) / previousMonthTotal) * 100
     : 0;
 
-  // Use actual days in current month (not hardcoded 30) for accurate fallback forecast
+  // Use actual days in current month (not hardcoded 30) for accurate forecast
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = Math.max(now.getDate(), 1);
+  const daysRemaining = daysInMonth - now.getDate();
+
+  // Linear extrapolation: always reliable, especially near month-end
+  const linearForecast = totalSpendMTD * (daysInMonth / dayOfMonth);
+
+  // AWS CE forecast can be unreliable for short remaining periods (≤5 days).
+  // Use it only when there are enough days left for the ML model to be meaningful,
+  // AND sanity-check it against linear extrapolation (reject if >2x deviation).
+  let bestForecast = linearForecast;
+  if (forecast > 0 && daysRemaining > 5) {
+    const awsForecast = totalSpendMTD + forecast;
+    // Reject AWS forecast if it deviates more than 2x from linear extrapolation
+    if (awsForecast < linearForecast * 2 && awsForecast > linearForecast * 0.5) {
+      bestForecast = awsForecast;
+    }
+  }
 
   return {
     totalSpendMTD,
     previousMonthTotal,
     changePercentage,
-    forecastedSpend: forecast > 0
-      ? totalSpendMTD + forecast
-      : totalSpendMTD * (daysInMonth / Math.max(now.getDate(), 1)),
+    forecastedSpend: bestForecast,
     monthlyCosts: monthlyTrend,
     topServices,
     accountId: validation.accountId || 'unknown',

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { canSeeSection, type SidebarSection } from '@/lib/auth/rbac';
@@ -102,7 +102,6 @@ interface SidebarProps {
 
 export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,17 +147,14 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   }
 
-  // Explicit navigation handler — ensures routing works even if Link's
-  // built-in handler is interrupted by sidebar collapse re-renders
-  function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
-    e.preventDefault();
-    // Collapse sidebar first, then navigate
+  // Collapse sidebar on link click — do NOT call e.preventDefault()
+  // so that Next.js Link handles navigation naturally via its built-in handler
+  function handleNavClick() {
     if (collapseTimer.current) {
       clearTimeout(collapseTimer.current);
       collapseTimer.current = null;
     }
     setExpanded(false);
-    router.push(href);
   }
 
   return (
@@ -188,7 +184,7 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex h-14 items-center border-b px-3">
-          <Link href="/dashboard" onClick={(e) => handleNavClick(e, '/dashboard')} className="flex items-center gap-2 overflow-hidden">
+          <Link href="/dashboard" onClick={handleNavClick} className="flex items-center gap-2 overflow-hidden">
             {expanded ? (
               <div className="flex items-center gap-2">
                 <Image src="/images/acc-logo.png" alt="ACC" width={32} height={15} className="h-5 w-auto shrink-0" />
@@ -276,7 +272,7 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
                         key={item.name}
                         href={item.href}
                         title={item.name}
-                        onClick={(e) => handleNavClick(e, item.href)}
+                        onClick={handleNavClick}
                         className={cn(
                           'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors',
                           expanded ? 'px-2.5' : 'justify-center py-2',
