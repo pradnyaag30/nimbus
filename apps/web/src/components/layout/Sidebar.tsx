@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { canSeeSection, type SidebarSection } from '@/lib/auth/rbac';
 import type { UserRole } from '@/lib/auth/types';
@@ -106,8 +106,12 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const visibleSections = navSections.filter((section) =>
-    canSeeSection(userRole, section.id),
+  // Memoize to prevent infinite re-render loop:
+  // Without useMemo, filter() creates a new array reference every render,
+  // which invalidates getActiveSection → useEffect → setOpenSections → re-render → loop
+  const visibleSections = useMemo(
+    () => navSections.filter((section) => canSeeSection(userRole, section.id)),
+    [userRole],
   );
 
   // Auto-open the section that contains the active route
