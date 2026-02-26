@@ -26,6 +26,8 @@ import {
   Database,
   Activity,
   FileText,
+  BookmarkCheck,
+  Calculator,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -50,9 +52,11 @@ const navSections: NavSection[] = [
       { name: 'Cost Explorer', href: '/dashboard/costs', icon: BarChart3 },
       { name: 'Budgets', href: '/dashboard/budgets', icon: Wallet },
       { name: 'Recommendations', href: '/dashboard/recommendations', icon: Lightbulb },
+      { name: 'Commitments', href: '/dashboard/commitments', icon: BookmarkCheck },
       { name: 'Anomalies', href: '/dashboard/anomalies', icon: AlertTriangle },
       { name: 'Trusted Advisor', href: '/dashboard/trusted-advisor', icon: ShieldCheck },
       { name: 'Resources', href: '/dashboard/resources', icon: Server },
+      { name: 'Workload Planner', href: '/dashboard/workload-planner', icon: Calculator },
     ],
   },
   {

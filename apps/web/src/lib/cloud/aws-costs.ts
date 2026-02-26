@@ -478,15 +478,19 @@ export interface RIPurchaseRecommendation {
   estimatedMonthlySavings: number;
 }
 
-export async function getRIPurchaseRecommendations(): Promise<RIPurchaseRecommendation[]> {
+export async function getRIPurchaseRecommendations(options?: {
+  termInYears?: 'ONE_YEAR' | 'THREE_YEARS';
+  paymentOption?: 'NO_UPFRONT' | 'ALL_UPFRONT' | 'PARTIAL_UPFRONT';
+  lookbackPeriod?: 'SEVEN_DAYS' | 'THIRTY_DAYS' | 'SIXTY_DAYS';
+}): Promise<RIPurchaseRecommendation[]> {
   const client = createCostExplorerClient();
 
   try {
     const command = new GetReservationPurchaseRecommendationCommand({
       Service: 'Amazon Elastic Compute Cloud - Compute',
-      TermInYears: 'ONE_YEAR',
-      PaymentOption: 'NO_UPFRONT',
-      LookbackPeriodInDays: 'SIXTY_DAYS',
+      TermInYears: options?.termInYears || 'ONE_YEAR',
+      PaymentOption: options?.paymentOption || 'NO_UPFRONT',
+      LookbackPeriodInDays: options?.lookbackPeriod || 'SIXTY_DAYS',
     });
 
     const response = await client.send(command);
@@ -511,15 +515,19 @@ export interface SPPurchaseRecommendation {
   estimatedMonthlySavings: number;
 }
 
-export async function getSPPurchaseRecommendations(): Promise<SPPurchaseRecommendation[]> {
+export async function getSPPurchaseRecommendations(options?: {
+  termInYears?: 'ONE_YEAR' | 'THREE_YEARS';
+  paymentOption?: 'NO_UPFRONT' | 'ALL_UPFRONT' | 'PARTIAL_UPFRONT';
+  lookbackPeriod?: 'SEVEN_DAYS' | 'THIRTY_DAYS' | 'SIXTY_DAYS';
+}): Promise<SPPurchaseRecommendation[]> {
   const client = createCostExplorerClient();
 
   try {
     const command = new GetSavingsPlansPurchaseRecommendationCommand({
       SavingsPlansType: 'COMPUTE_SP',
-      TermInYears: 'ONE_YEAR',
-      PaymentOption: 'NO_UPFRONT',
-      LookbackPeriodInDays: 'SIXTY_DAYS',
+      TermInYears: options?.termInYears || 'ONE_YEAR',
+      PaymentOption: options?.paymentOption || 'NO_UPFRONT',
+      LookbackPeriodInDays: options?.lookbackPeriod || 'SIXTY_DAYS',
     });
 
     const response = await client.send(command);

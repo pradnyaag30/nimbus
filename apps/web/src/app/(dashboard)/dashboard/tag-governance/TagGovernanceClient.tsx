@@ -1,8 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import {
-  Tag, CheckCircle, XCircle, AlertTriangle, Info, Search,
+  Tag, CheckCircle, XCircle, AlertTriangle, Info, Search, Map, BarChart3, DollarSign,
 } from 'lucide-react';
+import type { TagMappingRecord, TagExplorerData } from '@/lib/cloud/tags/types';
+import { TagMappingConfig } from './components/TagMappingConfig';
+import { TagExplorer } from './components/TagExplorer';
+import { UntaggedCostImpact } from './components/UntaggedCostImpact';
 
 // --- Types -------------------------------------------------------------------
 
@@ -26,7 +31,18 @@ interface TagComplianceSummary {
 
 interface TagGovernanceClientProps {
   data: TagComplianceSummary | null;
+  tagMappings: TagMappingRecord[];
+  explorerData: TagExplorerData | null;
 }
+
+type TabId = 'compliance' | 'explorer' | 'mappings' | 'untagged';
+
+const TABS: { id: TabId; label: string; icon: typeof Tag }[] = [
+  { id: 'compliance', label: 'Compliance', icon: CheckCircle },
+  { id: 'explorer', label: 'Tag Explorer', icon: BarChart3 },
+  { id: 'mappings', label: 'Tag Mappings', icon: Map },
+  { id: 'untagged', label: 'Untagged Impact', icon: DollarSign },
+];
 
 // --- Helpers -----------------------------------------------------------------
 
@@ -52,80 +68,58 @@ function getComplianceBadge(percent: number): string {
 
 function TagGovernanceUnavailable({ errorMessage }: { errorMessage?: string }) {
   return (
-    <div className="space-y-6 animate-in">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tag Governance</h1>
-        <p className="text-sm text-muted-foreground">
-          Tag compliance, cost allocation tags, and resource tagging policies.
-        </p>
+    <div className="flex flex-col items-center justify-center rounded-xl border bg-card p-16 text-center shadow-sm">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+        <Tag className="h-8 w-8 text-primary" />
+      </div>
+      <h2 className="mt-6 text-xl font-semibold">Tag Compliance — Unavailable</h2>
+      <p className="mt-2 max-w-md text-sm text-muted-foreground">
+        {errorMessage || 'Unable to fetch tag compliance data. Ensure AWS credentials are configured and the Resource Groups Tagging API is accessible.'}
+      </p>
+
+      <div className="mt-8 grid w-full max-w-lg gap-3">
+        {[
+          { icon: Tag, label: 'Required Tags', description: 'Enforce Environment, Team, CostCenter, ProjectName, and ProjectOwner tags' },
+          { icon: Search, label: 'Compliance Tracking', description: 'Monitor tag compliance across all AWS resources' },
+          { icon: CheckCircle, label: 'Cost Allocation Tags', description: 'Track which tags are activated for cost attribution' },
+          { icon: AlertTriangle, label: 'Gap Analysis', description: 'Identify untagged resources that need attention' },
+        ].map((item) => (
+          <div key={item.label} className="flex items-center justify-between rounded-lg border p-4 text-left">
+            <div className="flex items-center gap-3">
+              <item.icon className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.description}</p>
+              </div>
+            </div>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+              AWS Tags
+            </span>
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-col items-center justify-center rounded-xl border bg-card p-16 text-center shadow-sm">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <Tag className="h-8 w-8 text-primary" />
-        </div>
-        <h2 className="mt-6 text-xl font-semibold">Tag Governance — Unavailable</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          {errorMessage || 'Unable to fetch tag compliance data. Ensure AWS credentials are configured and the Resource Groups Tagging API is accessible.'}
-        </p>
-
-        <div className="mt-8 grid w-full max-w-lg gap-3">
-          {[
-            { icon: Tag, label: 'Required Tags', description: 'Enforce Environment, Team, CostCenter, ProjectName, and ProjectOwner tags' },
-            { icon: Search, label: 'Compliance Tracking', description: 'Monitor tag compliance across all AWS resources' },
-            { icon: CheckCircle, label: 'Cost Allocation Tags', description: 'Track which tags are activated for cost attribution' },
-            { icon: AlertTriangle, label: 'Gap Analysis', description: 'Identify untagged resources that need attention' },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between rounded-lg border p-4 text-left">
-              <div className="flex items-center gap-3">
-                <item.icon className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
-                </div>
-              </div>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                AWS Tags
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 w-full max-w-lg">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left dark:border-blue-800 dark:bg-blue-900/20">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">How it works</p>
-            <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-              Tag governance uses the AWS Resource Groups Tagging API to scan your resources
-              and check compliance against required tags. Configure your AWS credentials in
-              the environment to enable this feature.
-            </p>
-          </div>
+      <div className="mt-6 w-full max-w-lg">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-left dark:border-blue-800 dark:bg-blue-900/20">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">How it works</p>
+          <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+            Tag governance uses the AWS Resource Groups Tagging API to scan your resources
+            and check compliance against required tags. Configure your AWS credentials in
+            the environment to enable this feature.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// --- Active Tag Governance View ----------------------------------------------
+// --- Compliance Tab ----------------------------------------------------------
 
-export function TagGovernanceClient({ data }: TagGovernanceClientProps) {
-  // Show unavailable state if no data or error status
-  if (!data || data.status === 'error') {
-    return <TagGovernanceUnavailable errorMessage={data?.errorMessage} />;
-  }
-
+function ComplianceTab({ data }: { data: TagComplianceSummary }) {
   const { totalResources, taggedResources, untaggedResources, compliancePercent, requiredTags, costAllocationTags } = data;
 
   return (
-    <div className="space-y-6 animate-in">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tag Governance</h1>
-        <p className="text-sm text-muted-foreground">
-          Tag compliance across {totalResources} resources — {requiredTags.length} required tags evaluated
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-4">
         <div className="rounded-xl border bg-card p-6">
@@ -296,12 +290,79 @@ export function TagGovernanceClient({ data }: TagGovernanceClientProps) {
             About Tag Governance
           </p>
           <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
-            Tag compliance is checked against required tags: Environment, Team, CostCenter, ProjectName, ProjectOwner.
+            Tag compliance is checked against required tags configured in the Tag Mappings tab.
             Enable cost allocation tags in AWS Billing Console for accurate cost attribution. Tag data is
             fetched from the AWS Resource Groups Tagging API and cached for performance.
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// --- Active Tag Governance View with Tabs ------------------------------------
+
+export function TagGovernanceClient({ data, tagMappings, explorerData }: TagGovernanceClientProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('compliance');
+
+  return (
+    <div className="space-y-6 animate-in">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Tag Governance</h1>
+        <p className="text-sm text-muted-foreground">
+          Tag compliance, cross-cloud mapping, tag usage explorer, and untagged cost impact.
+        </p>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'compliance' && (
+        !data || data.status === 'error' ? (
+          <TagGovernanceUnavailable errorMessage={data?.errorMessage} />
+        ) : (
+          <ComplianceTab data={data} />
+        )
+      )}
+
+      {activeTab === 'explorer' && (
+        explorerData ? (
+          <TagExplorer data={explorerData} />
+        ) : (
+          <div className="flex flex-col items-center justify-center rounded-xl border bg-card p-16 text-center shadow-sm">
+            <BarChart3 className="h-8 w-8 text-muted-foreground" />
+            <h2 className="mt-4 text-lg font-semibold">Tag Explorer</h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              Tag usage data is not available. Configure AWS credentials to enable tag exploration.
+            </p>
+          </div>
+        )
+      )}
+
+      {activeTab === 'mappings' && (
+        <TagMappingConfig initialMappings={tagMappings} />
+      )}
+
+      {activeTab === 'untagged' && (
+        <UntaggedCostImpact />
+      )}
     </div>
   );
 }

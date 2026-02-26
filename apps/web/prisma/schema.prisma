@@ -39,6 +39,9 @@ model Tenant {
   costCenters       CostCenter[]
   businessUnits     BusinessUnit[]
   tenantConfig      TenantConfig?
+  workloadPlans     WorkloadPlan[]
+  commitmentItems   CommitmentItem[]
+  tagMappings       TagMapping[]
 
   @@map("tenants")
 }
@@ -142,6 +145,7 @@ enum CloudProvider {
   AWS
   AZURE
   GCP
+  OCI
   KUBERNETES
 }
 
@@ -604,4 +608,106 @@ enum AnomalySensitivity {
 enum CheckFrequency {
   DAILY
   WEEKLY
+}
+
+// =============================================================================
+// Workload Planning (Cloud Calculator)
+// =============================================================================
+
+model WorkloadPlan {
+  id               String        @id @default(cuid())
+  tenantId         String        @map("tenant_id")
+  name             String
+  description      String?       @db.Text
+  workloadConfig   Json          @map("workload_config")
+  pricingResults   Json?         @map("pricing_results")
+  selectedProvider CloudProvider? @map("selected_provider")
+  selectedRegion   String?       @map("selected_region")
+  status           PlanStatus    @default(DRAFT)
+  createdBy        String        @map("created_by")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("workload_plans")
+}
+
+enum PlanStatus {
+  DRAFT
+  FINALIZED
+  ARCHIVED
+}
+
+// =============================================================================
+// Commitment Portfolio (RI / SP / CUD Tracking)
+// =============================================================================
+
+model CommitmentItem {
+  id                 String           @id @default(cuid())
+  tenantId           String           @map("tenant_id")
+  cloudAccountId     String           @map("cloud_account_id")
+  provider           CloudProvider
+  commitmentType     CommitmentType   @map("commitment_type")
+  commitmentId       String           @map("commitment_id")
+  commitmentName     String?          @map("commitment_name")
+  hourlyCommitment   Decimal?         @map("hourly_commitment") @db.Decimal(20, 10)
+  upfrontCost        Decimal?         @map("upfront_cost") @db.Decimal(20, 2)
+  serviceType        String?          @map("service_type")
+  instanceFamily     String?          @map("instance_family")
+  region             String?
+  term               String?
+  paymentOption      String?          @map("payment_option")
+  status             CommitmentStatus @default(ACTIVE)
+  startDate          DateTime         @map("start_date")
+  endDate            DateTime         @map("end_date")
+  utilizationPercent Decimal?         @map("utilization_percent") @db.Decimal(5, 2)
+  lastSyncAt         DateTime?        @map("last_sync_at")
+  metadata           Json             @default("{}")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, commitmentId])
+  @@index([tenantId, endDate])
+  @@map("commitment_items")
+}
+
+enum CommitmentType {
+  RESERVED_INSTANCE
+  SAVINGS_PLAN
+  COMMITTED_USE_DISCOUNT
+}
+
+enum CommitmentStatus {
+  ACTIVE
+  EXPIRED
+  PENDING
+  CANCELLED
+}
+
+// =============================================================================
+// Tag Mapping (Cross-Cloud Tag Normalization)
+// =============================================================================
+
+model TagMapping {
+  id                   String        @id @default(cuid())
+  tenantId             String        @map("tenant_id")
+  dimensionName        String        @map("dimension_name")
+  dimensionDescription String?       @map("dimension_description") @db.Text
+  provider             CloudProvider
+  cloudTagKey          String        @map("cloud_tag_key")
+  valueMapping         Json?         @map("value_mapping")
+  isRequired           Boolean       @default(false) @map("is_required")
+  isActive             Boolean       @default(true) @map("is_active")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, cloudTagKey])
+  @@index([tenantId, dimensionName])
+  @@map("tag_mappings")
 }

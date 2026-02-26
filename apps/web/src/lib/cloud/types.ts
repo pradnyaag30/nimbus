@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CloudProviderSchema = z.enum(['AWS', 'AZURE', 'GCP', 'KUBERNETES']);
+export const CloudProviderSchema = z.enum(['AWS', 'AZURE', 'GCP', 'OCI', 'KUBERNETES']);
 export type CloudProviderType = z.infer<typeof CloudProviderSchema>;
 
 export const CloudCredentialsSchema = z.discriminatedUnion('provider', [
@@ -22,6 +22,14 @@ export const CloudCredentialsSchema = z.discriminatedUnion('provider', [
     provider: z.literal('GCP'),
     projectId: z.string().min(1),
     serviceAccountKey: z.string().min(1),
+  }),
+  z.object({
+    provider: z.literal('OCI'),
+    tenancyOcid: z.string().min(1),
+    userOcid: z.string().min(1),
+    fingerprint: z.string().min(1),
+    privateKey: z.string().min(1),
+    region: z.string().min(1),
   }),
   z.object({
     provider: z.literal('KUBERNETES'),
