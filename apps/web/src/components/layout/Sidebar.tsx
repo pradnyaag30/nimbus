@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { canSeeSection, type SidebarSection } from '@/lib/auth/rbac';
 import type { UserRole } from '@/lib/auth/types';
@@ -102,8 +102,10 @@ interface SidebarProps {
 
 export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const visibleSections = navSections.filter((section) =>
     canSeeSection(userRole, section.id),
@@ -127,8 +129,36 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
     setOpenSections((prev) => ({ ...prev, [activeSection]: true }));
   }, [pathname, getActiveSection]);
 
+  // Debounced expand/collapse to prevent race conditions with link clicks
+  function handleMouseEnter() {
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+    setExpanded(true);
+  }
+
+  function handleMouseLeave() {
+    collapseTimer.current = setTimeout(() => {
+      setExpanded(false);
+    }, 400);
+  }
+
   function toggleSection(sectionId: string) {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  }
+
+  // Explicit navigation handler — ensures routing works even if Link's
+  // built-in handler is interrupted by sidebar collapse re-renders
+  function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
+    e.preventDefault();
+    // Collapse sidebar first, then navigate
+    if (collapseTimer.current) {
+      clearTimeout(collapseTimer.current);
+      collapseTimer.current = null;
+    }
+    setExpanded(false);
+    router.push(href);
   }
 
   return (
@@ -136,7 +166,7 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
       {/* Hover trigger strip — always visible */}
       <div
         className="fixed inset-y-0 left-0 z-40 w-3 cursor-pointer"
-        onMouseEnter={() => setExpanded(true)}
+        onMouseEnter={handleMouseEnter}
       />
 
       {/* Backdrop overlay when expanded */}
@@ -153,12 +183,12 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
           'fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-sidebar transition-all duration-300 ease-in-out',
           expanded ? 'w-64' : 'w-14',
         )}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Logo */}
         <div className="flex h-14 items-center border-b px-3">
-          <Link href="/dashboard" className="flex items-center gap-2 overflow-hidden">
+          <Link href="/dashboard" onClick={(e) => handleNavClick(e, '/dashboard')} className="flex items-center gap-2 overflow-hidden">
             {expanded ? (
               <div className="flex items-center gap-2">
                 <Image src="/images/acc-logo.png" alt="ACC" width={32} height={15} className="h-5 w-auto shrink-0" />
@@ -188,6 +218,10 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
                 ? pathname === '/dashboard'
                 : pathname.startsWith(item.href),
             );
+
+            // When sidebar is expanded: show items only if section is open (CSS-based, no unmount)
+            // When sidebar is collapsed: always show items (icon-only mode)
+            const shouldShowItems = expanded ? isOpen : true;
 
             return (
               <div key={section.id}>
@@ -222,34 +256,41 @@ export function Sidebar({ userRole = 'FINOPS_ADMIN' }: SidebarProps) {
                   <div className="my-1.5 border-t" />
                 )}
 
-                {/* Section Items — collapsible when expanded, always shown when collapsed */}
-                {(expanded ? isOpen : true) && (
-                  <div className={cn(expanded && 'ml-2 mt-0.5 space-y-0.5 border-l border-border/50 pl-2')}>
-                    {section.items.map((item) => {
-                      const isActive =
-                        item.href === '/dashboard'
-                          ? pathname === '/dashboard'
-                          : pathname.startsWith(item.href);
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          title={item.name}
-                          className={cn(
-                            'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors',
-                            expanded ? 'px-2.5' : 'justify-center py-2',
-                            isActive
-                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                          )}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0" />
-                          {expanded && <span className="truncate">{item.name}</span>}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* Section Items — CSS visibility, never unmounted */}
+                <div
+                  className={cn(
+                    'overflow-hidden transition-all duration-200',
+                    expanded && 'ml-2 mt-0.5 space-y-0.5 border-l border-border/50 pl-2',
+                    expanded && !shouldShowItems && 'max-h-0 opacity-0',
+                    expanded && shouldShowItems && 'max-h-[600px] opacity-100',
+                    !expanded && 'max-h-[600px]',
+                  )}
+                >
+                  {section.items.map((item) => {
+                    const isActive =
+                      item.href === '/dashboard'
+                        ? pathname === '/dashboard'
+                        : pathname.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        title={item.name}
+                        onClick={(e) => handleNavClick(e, item.href)}
+                        className={cn(
+                          'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors',
+                          expanded ? 'px-2.5' : 'justify-center py-2',
+                          isActive
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                        )}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        {expanded && <span className="truncate">{item.name}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
